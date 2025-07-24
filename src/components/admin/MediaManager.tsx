@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Image, Trash2, Edit, Eye, Download, Link } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,43 +36,52 @@ const MediaManager = () => {
     terminal: ''
   });
 
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([
-    {
-      id: 1,
-      name: 'logo-principal.png',
-      url: '/placeholder.svg',
-      type: 'image/png',
-      size: '45 KB',
-      category: 'logos',
-      altText: 'Logo principal del sistema de terminales',
-      description: 'Logo utilizado en el header del sitio web',
-      uploadDate: '2024-06-20',
-      terminal: 'general'
-    },
-    {
-      id: 2,
-      name: 'terminal-posadas.jpg',
-      url: '/placeholder.svg',
-      type: 'image/jpeg',
-      size: '156 KB',
-      category: 'terminals',
-      altText: 'Terminal de ómnibus de Posadas',
-      description: 'Imagen principal de la terminal de Posadas',
-      uploadDate: '2024-06-22',
-      terminal: 'Posadas'
-    },
-    {
-      id: 3,
-      name: 'favicon.ico',
-      url: '/placeholder.svg',
-      type: 'image/x-icon',
-      size: '4 KB',
-      category: 'seo',
-      altText: 'Favicon del sitio web',
-      description: 'Icono que aparece en la pestaña del navegador',
-      uploadDate: '2024-06-18'
-    }
-  ]);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch files from Supabase Storage
+  useEffect(() => {
+    const fetchFiles = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.storage
+          .from('terminal-images')
+          .list();
+
+        if (error) {
+          console.error('Error fetching files:', error);
+          return;
+        }
+
+        const files: MediaFile[] = data?.map((file, index) => {
+          const { data: urlData } = supabase.storage
+            .from('terminal-images')
+            .getPublicUrl(file.name);
+
+          return {
+            id: index + 1,
+            name: file.name,
+            url: urlData.publicUrl,
+            type: file.metadata?.mimetype || 'unknown',
+            size: file.metadata?.size ? `${Math.round(file.metadata.size / 1024)} KB` : 'N/A',
+            category: 'terminals', // Default category, can be enhanced later
+            altText: file.name,
+            description: '',
+            uploadDate: new Date(file.created_at).toISOString().split('T')[0],
+            terminal: 'general'
+          };
+        }) || [];
+
+        setMediaFiles(files);
+      } catch (error) {
+        console.error('Error fetching media files:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFiles();
+  }, []);
 
   const categories = [
     { value: 'all', label: 'Todas las categorías' },
@@ -94,35 +104,59 @@ const MediaManager = () => {
     selectedCategory === 'all' || file.category === selectedCategory
   );
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      const fileUrl = URL.createObjectURL(file);
       
-      const newFile: MediaFile = {
-        id: Date.now(),
-        name: file.name,
-        url: fileUrl,
-        type: file.type,
-        size: `${Math.round(file.size / 1024)} KB`,
-        category: uploadData.category,
-        altText: uploadData.altText || file.name,
-        description: uploadData.description,
-        uploadDate: new Date().toISOString().split('T')[0],
-        terminal: uploadData.terminal || 'general'
-      };
-      
-      setMediaFiles(prev => [...prev, newFile]);
-      setShowUploadForm(false);
-      setUploadData({
-        name: '',
-        url: '',
-        category: 'general',
-        altText: '',
-        description: '',
-        terminal: ''
-      });
+      try {
+        setLoading(true);
+        
+        // Upload to Supabase Storage
+        const fileName = `${Date.now()}-${file.name}`;
+        const { data, error } = await supabase.storage
+          .from('terminal-images')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) throw error;
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('terminal-images')
+          .getPublicUrl(data.path);
+        
+        const newFile: MediaFile = {
+          id: Date.now(),
+          name: uploadData.name || file.name,
+          url: urlData.publicUrl,
+          type: file.type,
+          size: `${Math.round(file.size / 1024)} KB`,
+          category: uploadData.category,
+          altText: uploadData.altText || file.name,
+          description: uploadData.description,
+          uploadDate: new Date().toISOString().split('T')[0],
+          terminal: uploadData.terminal || 'general'
+        };
+        
+        setMediaFiles(prev => [...prev, newFile]);
+        setShowUploadForm(false);
+        setUploadData({
+          name: '',
+          url: '',
+          category: 'general',
+          altText: '',
+          description: '',
+          terminal: ''
+        });
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Error al subir el archivo. Inténtalo de nuevo.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
