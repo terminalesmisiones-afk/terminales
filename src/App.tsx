@@ -22,28 +22,26 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <HotToaster />
-      <Toaster />
-      <BrowserRouter>
-        <div className="min-h-screen bg-background">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/terminal/:id" element={<Terminal />} />
-            <Route path="/terminales" element={<AllTerminals />} />
-            <Route path="/empresas" element={<TransportCompanies />} />
-            <Route path="/rutas" element={<MainRoutes />} />
-            <Route path="/contacto" element={<Contact />} />
-            <Route path="/ayuda" element={<HelpCenter />} />
-            <Route path="/privacidad" element={<PrivacyPolicy />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/*" element={<AdminDashboard />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <PWAInstallPrompt />
-        </div>
-      </BrowserRouter>
-    </TooltipProvider>
+    <HotToaster />
+    <Toaster />
+    <BrowserRouter>
+      <div className="min-h-screen bg-background">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/terminal/:id" element={<Terminal />} />
+          <Route path="/terminales" element={<AllTerminals />} />
+          <Route path="/empresas" element={<TransportCompanies />} />
+          <Route path="/rutas" element={<MainRoutes />} />
+          <Route path="/contacto" element={<Contact />} />
+          <Route path="/ayuda" element={<HelpCenter />} />
+          <Route path="/privacidad" element={<PrivacyPolicy />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/*" element={<AdminDashboard />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <PWAInstallPrompt />
+      </div>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
