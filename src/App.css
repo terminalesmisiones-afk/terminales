@@ -1,0 +1,5 @@
+
+/* Estilos específicos de la aplicación */
+.main-content {
+  @apply main-container;
+}
