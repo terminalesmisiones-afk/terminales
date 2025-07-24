@@ -14,7 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          arrival: string
+          company: string
+          created_at: string
+          departure: string
+          destination: string
+          frequency: string
+          id: string
+          platform: string
+          terminal_id: string
+          updated_at: string
+        }
+        Insert: {
+          arrival: string
+          company: string
+          created_at?: string
+          departure: string
+          destination: string
+          frequency: string
+          id?: string
+          platform: string
+          terminal_id: string
+          updated_at?: string
+        }
+        Update: {
+          arrival?: string
+          company?: string
+          created_at?: string
+          departure?: string
+          destination?: string
+          frequency?: string
+          id?: string
+          platform?: string
+          terminal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_terminal_id_fkey"
+            columns: ["terminal_id"]
+            isOneToOne: false
+            referencedRelation: "terminals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terminals: {
+        Row: {
+          address: string
+          city: string
+          company_count: number | null
+          created_at: string
+          description: string | null
+          email: string | null
+          id: string
+          image: string | null
+          is_active: boolean
+          last_updated: string
+          latitude: number | null
+          longitude: number | null
+          municipality_info: string | null
+          name: string
+          phone: string | null
+          schedules_visible: boolean
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          city: string
+          company_count?: number | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          image?: string | null
+          is_active?: boolean
+          last_updated?: string
+          latitude?: number | null
+          longitude?: number | null
+          municipality_info?: string | null
+          name: string
+          phone?: string | null
+          schedules_visible?: boolean
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          city?: string
+          company_count?: number | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          image?: string | null
+          is_active?: boolean
+          last_updated?: string
+          latitude?: number | null
+          longitude?: number | null
+          municipality_info?: string | null
+          name?: string
+          phone?: string | null
+          schedules_visible?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
