@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Terminal } from '@/types/terminal';
 import { useSupabaseTerminals } from '@/hooks/useSupabaseTerminals';
 import { filterTerminals } from '@/utils/terminalUtils';
