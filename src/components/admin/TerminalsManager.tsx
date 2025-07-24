@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import TerminalModal from './TerminalModal';
+import { useSupabaseTerminals } from '@/hooks/useSupabaseTerminals';
+import { useSupabaseAdmin } from '@/hooks/useSupabaseAdmin';
+import { Terminal as ImportedTerminal } from '@/types/terminal';
 
 interface Schedule {
   id: number;
@@ -40,259 +43,33 @@ const TerminalsManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
-  const [editingTerminal, setEditingTerminal] = useState<Terminal | null>(null);
+  const [editingTerminal, setEditingTerminal] = useState<any>(null);
 
-  // Función para contar empresas únicas basado en horarios reales
-  const countUniqueCompanies = (schedules: Schedule[] = []): number => {
-    const uniqueCompanies = new Set(schedules.map(schedule => schedule.company.trim().toLowerCase()));
-    return uniqueCompanies.size;
-  };
+  // Use Supabase hooks
+  const { terminals, loading, error, refreshTerminals } = useSupabaseTerminals();
+  const { createTerminal, updateTerminal, deleteTerminal, loading: adminLoading } = useSupabaseAdmin();
 
-  // Cargar terminales desde localStorage o usar las por defecto
-  const loadTerminals = (): Terminal[] => {
-    try {
-      const stored = localStorage.getItem('terminals');
-      if (stored) {
-        const terminals = JSON.parse(stored);
-        // Actualizar el contador de empresas para cada terminal
-        return terminals.map((terminal: Terminal) => ({
-          ...terminal,
-          companyCount: countUniqueCompanies(terminal.schedules || [])
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading terminals:', error);
-    }
+  // Transform Supabase terminals to local format
+  const localTerminals = terminals.map(terminal => ({
+    id: parseInt(terminal.id.replace(/-/g, '').slice(0, 8), 16), // Convert UUID to number for compatibility
+    name: terminal.name,
+    city: terminal.city,
+    address: terminal.address,
+    phone: terminal.phone || '',
+    email: '', // Will be added later
+    latitude: terminal.latitude || 0,
+    longitude: terminal.longitude || 0,
+    isActive: terminal.isActive,
+    schedulesVisible: terminal.schedulesVisible,
+    description: '',
+    municipalityInfo: '',
+    image: terminal.image,
+    companyCount: terminal.companyCount,
+    lastUpdated: terminal.lastUpdated.split('T')[0],
+    schedules: terminal.schedules || []
+  }));
 
-    // Lista completa de terminales de la Provincia de Misiones
-    const defaultTerminals = [
-      // Terminales principales con horarios
-      {
-        id: 1,
-        name: 'Posadas',
-        city: 'Posadas',
-        address: 'Av. Quaranta 2570, Posadas, Misiones',
-        phone: '+54 376 443-3333',
-        email: 'terminal@posadas.com',
-        latitude: -27.367,
-        longitude: -55.896,
-        isActive: true,
-        schedulesVisible: true,
-        description: 'Terminal principal de la ciudad de Posadas, capital de la provincia',
-        municipalityInfo: 'Posadas es la capital de la provincia de Misiones, Argentina. Conocida por su arquitectura colonial y su proximidad a las Cataratas del Iguazú.',
-        image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: [
-          { id: 1, company: 'Empresa Crucero del Norte', destination: 'Buenos Aires', departure: '08:00', arrival: '18:00', frequency: 'Diario', platform: '1' },
-          { id: 2, company: 'Singer', destination: 'Córdoba', departure: '10:30', arrival: '22:30', frequency: 'Diario', platform: '2' },
-          { id: 3, company: 'Expreso Singer', destination: 'Resistencia', departure: '14:00', arrival: '18:00', frequency: 'Diario', platform: '3' },
-          { id: 4, company: 'Via Bariloche', destination: 'Bariloche', departure: '20:00', arrival: '14:00+1', frequency: 'Martes, Jueves, Sábado', platform: '4' },
-          { id: 5, company: 'Empresa Crucero del Norte', destination: 'Iguazú', departure: '06:30', arrival: '10:30', frequency: 'Diario', platform: '5' }
-        ]
-      },
-      {
-        id: 2,
-        name: 'Oberá',
-        city: 'Oberá',
-        address: 'Av. Sarmiento 444, Oberá, Misiones',
-        phone: '+54 3755 42-2222',
-        email: 'terminal@obera.com',
-        latitude: -27.486,
-        longitude: -55.119,
-        isActive: true,
-        schedulesVisible: true,
-        description: 'Terminal de ómnibus de Oberá, capital nacional del inmigrante',
-        municipalityInfo: 'Oberá es conocida como la "Capital Nacional del Inmigrante" por su diversidad cultural y el Festival Nacional del Inmigrante.',
-        image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: [
-          { id: 1, company: 'Empresa Crucero del Norte', destination: 'Posadas', departure: '07:00', arrival: '08:30', frequency: 'Diario', platform: '1' },
-          { id: 2, company: 'Singer', destination: 'Buenos Aires', departure: '21:30', arrival: '11:30+1', frequency: 'Diario', platform: '2' },
-          { id: 3, company: 'Expreso Oberá', destination: 'Puerto Iguazú', departure: '09:00', arrival: '13:00', frequency: 'Lunes a Viernes', platform: '3' }
-        ]
-      },
-      {
-        id: 3,
-        name: 'Puerto Iguazú',
-        city: 'Puerto Iguazú',
-        address: 'Av. Córdoba 264, Puerto Iguazú, Misiones',
-        phone: '+54 3757 42-1111',
-        email: 'terminal@iguazu.com',
-        latitude: -25.597,
-        longitude: -54.578,
-        isActive: true,
-        schedulesVisible: true,
-        description: 'Terminal turística de Puerto Iguazú, puerta de entrada a las Cataratas',
-        municipalityInfo: 'Puerto Iguazú es la puerta de entrada a las mundialmente famosas Cataratas del Iguazú, una de las Siete Maravillas Naturales del Mundo.',
-        image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: [
-          { id: 1, company: 'Empresa Crucero del Norte', destination: 'Buenos Aires', departure: '19:30', arrival: '09:30+1', frequency: 'Diario', platform: '1' },
-          { id: 2, company: 'Singer', destination: 'Posadas', departure: '16:00', arrival: '20:00', frequency: 'Diario', platform: '2' },
-          { id: 3, company: 'Rio Uruguay', destination: 'Córdoba', departure: '22:00', arrival: '10:00+1', frequency: 'Martes, Jueves, Domingo', platform: '3' },
-          { id: 4, company: 'Expreso Iguazú', destination: 'Oberá', departure: '12:00', arrival: '16:00', frequency: 'Lunes a Viernes', platform: '4' }
-        ]
-      },
-      // Resto de terminales de Misiones (sin horarios iniciales)
-      {
-        id: 4,
-        name: 'Eldorado',
-        city: 'Eldorado',
-        address: 'Av. San Martín 1850, Eldorado, Misiones',
-        phone: '+54 3751 42-4444',
-        email: 'terminal@eldorado.com',
-        latitude: -26.401,
-        longitude: -54.616,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de Eldorado, importante centro productivo',
-        municipalityInfo: 'Eldorado es un importante centro productivo de la provincia, conocido por sus plantaciones de yerba mate y té.',
-        image: 'https://images.unsplash.com/photo-1441716844725-09cedc13b55f?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      },
-      {
-        id: 5,
-        name: 'Apóstoles',
-        city: 'Apóstoles',
-        address: 'Av. Tres Fronteras 230, Apóstoles, Misiones',
-        phone: '+54 3758 42-1234',
-        email: 'terminal@apostoles.com',
-        latitude: -27.908,
-        longitude: -55.768,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de Apóstoles',
-        municipalityInfo: 'Apóstoles es conocida por su producción agrícola y ganadera, destacándose en la yerba mate.',
-        image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      },
-      {
-        id: 6,
-        name: 'San Vicente',
-        city: 'San Vicente',
-        address: 'Ruta Provincial 17, San Vicente, Misiones',
-        phone: '+54 3755 49-1111',
-        email: 'terminal@sanvicente.com',
-        latitude: -26.618,
-        longitude: -54.129,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de San Vicente',
-        municipalityInfo: 'San Vicente es un municipio ubicado en el centro de la provincia de Misiones.',
-        image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      },
-      {
-        id: 7,
-        name: 'Montecarlo',
-        city: 'Montecarlo',
-        address: 'Av. Libertad 445, Montecarlo, Misiones',
-        phone: '+54 3751 48-2222',
-        email: 'terminal@montecarlo.com',
-        latitude: -26.567,
-        longitude: -54.743,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de Montecarlo',
-        municipalityInfo: 'Montecarlo es conocida por su producción citrícola y como centro turístico regional.',
-        image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      },
-      {
-        id: 8,
-        name: 'Aristóbulo del Valle',
-        city: 'Aristóbulo del Valle',
-        address: 'Av. San Martín 123, Aristóbulo del Valle, Misiones',
-        phone: '+54 3755 47-1234',
-        email: 'terminal@aristobulo.com',
-        latitude: -27.099,
-        longitude: -54.878,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de Aristóbulo del Valle',
-        municipalityInfo: 'Aristóbulo del Valle es un municipio del centro de Misiones, rodeado de naturaleza.',
-        image: 'https://images.unsplash.com/photo-1441716844725-09cedc13b55f?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      },
-      {
-        id: 9,
-        name: 'Leandro N. Alem',
-        city: 'Leandro N. Alem',
-        address: 'Av. San Martín 567, Leandro N. Alem, Misiones',
-        phone: '+54 3755 42-5678',
-        email: 'terminal@alem.com',
-        latitude: -27.599,
-        longitude: -55.323,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de Leandro N. Alem',
-        municipalityInfo: 'Leandro N. Alem es un importante centro agrícola de la provincia de Misiones.',
-        image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      },
-      {
-        id: 10,
-        name: 'Jardín América',
-        city: 'Jardín América',
-        address: 'Ruta Nacional 12, Jardín América, Misiones',
-        phone: '+54 3751 49-3333',
-        email: 'terminal@jardinamerica.com',
-        latitude: -27.034,
-        longitude: -55.226,
-        isActive: true,
-        schedulesVisible: false,
-        description: 'Terminal de Jardín América',
-        municipalityInfo: 'Jardín América es conocida por su producción agrícola y desarrollo industrial.',
-        image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=300&fit=crop',
-        companyCount: 0,
-        lastUpdated: new Date().toISOString().split('T')[0],
-        schedules: []
-      }
-    ].map(terminal => ({
-      ...terminal,
-      companyCount: countUniqueCompanies(terminal.schedules || [])
-    }));
-
-    // Guardar las terminales por defecto en localStorage
-    localStorage.setItem('terminals', JSON.stringify(defaultTerminals));
-    return defaultTerminals;
-  };
-
-  const [terminals, setTerminals] = useState<Terminal[]>(loadTerminals());
-
-  // Guardar terminales en localStorage cada vez que cambien
-  const saveTerminals = (newTerminals: Terminal[]) => {
-    // Actualizar contador de empresas antes de guardar
-    const terminalsWithUpdatedCount = newTerminals.map(terminal => ({
-      ...terminal,
-      companyCount: countUniqueCompanies(terminal.schedules || []),
-      lastUpdated: new Date().toISOString().split('T')[0] // Actualizar fecha automáticamente
-    }));
-    
-    setTerminals(terminalsWithUpdatedCount);
-    localStorage.setItem('terminals', JSON.stringify(terminalsWithUpdatedCount));
-    console.log('Terminales guardadas con fecha actualizada:', terminalsWithUpdatedCount);
-    
-    // Disparar evento para notificar cambios en tiempo real
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const filteredTerminals = terminals.filter(terminal => {
+  const filteredTerminals = localTerminals.filter(terminal => {
     const matchesSearch = 
       terminal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       terminal.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -313,48 +90,58 @@ const TerminalsManager = () => {
     setShowModal(true);
   };
 
-  const handleEdit = (terminal: Terminal) => {
+  const handleEdit = (terminal: any) => {
     setEditingTerminal(terminal);
     setShowModal(true);
   };
 
-  const handleSave = (terminalData: Terminal) => {
-    console.log('Guardando terminal:', terminalData);
-    
-    if (editingTerminal) {
-      const updatedTerminals = terminals.map(t => 
-        t.id === editingTerminal.id ? { 
-          ...terminalData, 
-          id: editingTerminal.id,
-          lastUpdated: new Date().toISOString().split('T')[0]
-        } : t
-      );
-      saveTerminals(updatedTerminals);
-    } else {
-      const newTerminal = {
-        ...terminalData,
-        id: Date.now(),
-        companyCount: countUniqueCompanies(terminalData.schedules || []),
-        lastUpdated: new Date().toISOString().split('T')[0]
-      };
-      console.log('Nueva terminal creada:', newTerminal);
-      saveTerminals([...terminals, newTerminal]);
+  const handleSave = async (terminalData: any) => {
+    try {
+      if (editingTerminal) {
+        await updateTerminal(editingTerminal.id, terminalData);
+      } else {
+        await createTerminal(terminalData);
+      }
+      refreshTerminals();
+      setShowModal(false);
+    } catch (error) {
+      console.error('Error saving terminal:', error);
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (terminalId: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar esta terminal?')) {
-      const updatedTerminals = terminals.filter(t => t.id !== id);
-      saveTerminals(updatedTerminals);
+      try {
+        await deleteTerminal(terminalId);
+        refreshTerminals();
+      } catch (error) {
+        console.error('Error deleting terminal:', error);
+      }
     }
   };
 
-  const toggleVisibility = (id: number) => {
-    const updatedTerminals = terminals.map(t => 
-      t.id === id ? { ...t, schedulesVisible: !t.schedulesVisible } : t
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="text-lg">Cargando terminales...</div>
+        </div>
+      </div>
     );
-    saveTerminals(updatedTerminals);
-  };
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="text-lg text-red-600">Error: {error}</div>
+          <Button onClick={refreshTerminals} className="mt-4">
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -373,14 +160,14 @@ const TerminalsManager = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-primary">{terminals.length}</div>
+            <div className="text-2xl font-bold text-primary">{localTerminals.length}</div>
             <p className="text-sm text-gray-600">Total Terminales</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-secondary">
-              {terminals.filter(t => t.isActive).length}
+              {localTerminals.filter(t => t.isActive).length}
             </div>
             <p className="text-sm text-gray-600">Activas</p>
           </CardContent>
@@ -388,7 +175,7 @@ const TerminalsManager = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-accent">
-              {terminals.filter(t => t.schedulesVisible).length}
+              {localTerminals.filter(t => t.schedulesVisible).length}
             </div>
             <p className="text-sm text-gray-600">Con Horarios</p>
           </CardContent>
@@ -396,7 +183,7 @@ const TerminalsManager = () => {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-gray-600">
-              {terminals.reduce((sum, t) => sum + t.companyCount, 0)}
+              {localTerminals.reduce((sum, t) => sum + t.companyCount, 0)}
             </div>
             <p className="text-sm text-gray-600">Total Empresas</p>
           </CardContent>
@@ -515,19 +302,7 @@ const TerminalsManager = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => toggleVisibility(terminal.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {terminal.schedulesVisible ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(terminal.id)}
+                          onClick={() => handleDelete(terminals.find(t => parseInt(t.id.replace(/-/g, '').slice(0, 8), 16) === terminal.id)?.id || '')}
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />

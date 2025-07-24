@@ -13,6 +13,7 @@ import AnalyticsManager from '@/components/admin/AnalyticsManager';
 import SeoManager from '@/components/admin/SeoManager';
 import MediaManager from '@/components/admin/MediaManager';
 import NotificationCenter from '@/components/admin/NotificationCenter';
+import SupabaseNotificationCenter from '@/components/admin/SupabaseNotificationCenter';
 import PushNotificationManager from '@/components/admin/PushNotificationManager';
 import TransportCompaniesManager from '@/components/admin/TransportCompaniesManager';
 import SharingConfigManager from '@/components/admin/SharingConfigManager';
@@ -52,12 +53,7 @@ const AdminDashboard = () => {
               <Route path="seo" element={<SeoManager />} />
               <Route path="compartir" element={<SharingConfigManager />} />
               <Route path="media" element={<MediaManager />} />
-              <Route path="notificaciones" element={
-                <NotificationCenter 
-                  isOpen={true} 
-                  onClose={() => {}} 
-                />
-              } />
+              <Route path="notificaciones" element={<SupabaseNotificationCenter />} />
               <Route path="push" element={<PushNotificationManager />} />
             </Routes>
           </div>
