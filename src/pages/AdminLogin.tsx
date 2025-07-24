@@ -1,33 +1,60 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 const AdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user, isAdmin, loading } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading) {
+      if (user && isAdmin) {
+        navigate('/admin/dashboard');
+      } else if (user && !isAdmin) {
+        setError('Acceso denegado. Se requieren privilegios de administrador.');
+      }
+    }
+  }, [user, isAdmin, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     
-    // Simulación de login - en producción sería una llamada a API
-    setTimeout(() => {
-      if (email === 'admin@terminales.com' && password === 'admin123') {
-        localStorage.setItem('adminToken', 'mock-token');
-        navigate('/admin/dashboard');
-      } else {
-        alert('Credenciales incorrectas');
-      }
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Inicio de sesión exitoso",
+        description: "Verificando privilegios de administrador...",
+      });
+      
+    } catch (error: any) {
+      console.error('Error de login:', error);
+      setError(error.message || 'Error al iniciar sesión');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -55,12 +82,18 @@ const AdminLogin = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@terminales.com"
+                  placeholder="admin@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -112,14 +145,11 @@ const AdminLogin = () => {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
-              <p>Credenciales de prueba:</p>
-              <p>Email: <code className="bg-gray-100 px-1 rounded">admin@terminales.com</code></p>
-              <p>Password: <code className="bg-gray-100 px-1 rounded">admin123</code></p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <Link to="/" className="text-sm text-primary hover:underline">
+            <div className="mt-4 text-center space-y-2">
+              <Link to="/auth" className="text-sm text-primary hover:underline block">
+                ¿Necesitas una cuenta? Regístrate
+              </Link>
+              <Link to="/" className="text-sm text-primary hover:underline block">
                 ← Volver al sitio web
               </Link>
             </div>

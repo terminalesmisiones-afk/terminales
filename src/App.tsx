@@ -7,6 +7,7 @@ import { Toaster as HotToaster } from "@/components/ui/toaster";
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import Index from "./pages/Index";
 import Terminal from "./pages/Terminal";
+import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import NotFound from "./pages/NotFound";
@@ -16,6 +17,7 @@ import MainRoutes from "./pages/MainRoutes";
 import Contact from "./pages/Contact";
 import HelpCenter from "./pages/HelpCenter";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -34,8 +36,13 @@ const App = () => (
           <Route path="/contacto" element={<Contact />} />
           <Route path="/ayuda" element={<HelpCenter />} />
           <Route path="/privacidad" element={<PrivacyPolicy />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/*" element={<AdminDashboard />} />
+          <Route path="/admin/*" element={
+            <ProtectedRoute requireAdmin={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <PWAInstallPrompt />

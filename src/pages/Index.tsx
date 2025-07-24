@@ -1,16 +1,20 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import Header from '@/components/Header';
 import HeroSection from '@/components/HeroSection';
 import TerminalsGrid from '@/components/TerminalsGrid';
 import Footer from '@/components/Footer';
 import ResponsiveAdSlot from '@/components/ResponsiveAdSlot';
+import { Button } from '@/components/ui/button';
+import { LogIn, Settings, LogOut } from 'lucide-react';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const navigate = useNavigate();
+  const { user, isAdmin, signOut } = useAuth();
 
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -101,6 +105,34 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-white">
       <Header />
+      
+      {/* Auth buttons in top right */}
+      <div className="fixed top-4 right-4 z-50 flex gap-2">
+        {user ? (
+          <>
+            {isAdmin && (
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/admin/dashboard">
+                  <Settings className="h-4 w-4 mr-1" />
+                  Admin
+                </Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={signOut}>
+              <LogOut className="h-4 w-4 mr-1" />
+              Salir
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/auth">
+              <LogIn className="h-4 w-4 mr-1" />
+              Iniciar Sesión
+            </Link>
+          </Button>
+        )}
+      </div>
+      
       <main className="px-4 md:px-0">
         <HeroSection 
           onSearch={handleSearch}
