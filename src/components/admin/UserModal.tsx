@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { sanitizeInput, isValidEmail, isValidName, validatePasswordStrength } from '@/utils/security';
 
 interface User {
   id?: number;
@@ -38,6 +40,8 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
     permissions: []
   });
 
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
   const availableTerminals = [
     'Posadas', 'Oberá', 'Puerto Iguazú', 'Eldorado', 'Apóstoles', 'Leandro N. Alem'
   ];
@@ -64,9 +68,55 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
     }
   }, [user, isOpen]);
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validate name
+    if (!formData.name.trim()) {
+      errors.name = 'El nombre es requerido';
+    } else if (!isValidName(formData.name)) {
+      errors.name = 'El nombre solo puede contener letras, espacios, guiones y apostrofes';
+    }
+
+    // Validate email
+    if (!formData.email.trim()) {
+      errors.email = 'El email es requerido';
+    } else if (!isValidEmail(formData.email)) {
+      errors.email = 'El formato del email no es válido';
+    }
+
+    // Validate password (only for new users or when changing password)
+    if (!user && formData.password) {
+      const passwordValidation = validatePasswordStrength(formData.password);
+      if (!passwordValidation.valid) {
+        errors.password = passwordValidation.error || 'Contraseña no válida';
+      }
+    } else if (user && formData.password) {
+      const passwordValidation = validatePasswordStrength(formData.password);
+      if (!passwordValidation.valid) {
+        errors.password = passwordValidation.error || 'Contraseña no válida';
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    // Sanitize data before saving
+    const sanitizedData = {
+      ...formData,
+      name: sanitizeInput(formData.name.trim()),
+      email: sanitizeInput(formData.email.trim().toLowerCase())
+    };
+
+    onSave(sanitizedData);
     onClose();
   };
 
@@ -108,6 +158,14 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {Object.keys(validationErrors).length > 0 && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertDescription className="text-red-700">
+                Por favor, corrige los errores en el formulario antes de continuar.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <Card>
@@ -122,7 +180,11 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
                       required
+                      className={validationErrors.name ? 'border-red-500' : ''}
                     />
+                    {validationErrors.name && (
+                      <p className="text-sm text-red-600 mt-1">{validationErrors.name}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="email">Email</Label>
@@ -132,7 +194,11 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
                       value={formData.email}
                       onChange={(e) => handleChange('email', e.target.value)}
                       required
+                      className={validationErrors.email ? 'border-red-500' : ''}
                     />
+                    {validationErrors.email && (
+                      <p className="text-sm text-red-600 mt-1">{validationErrors.email}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="password">
@@ -144,7 +210,16 @@ const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, user, onSave }) 
                       value={formData.password}
                       onChange={(e) => handleChange('password', e.target.value)}
                       required={!user}
+                      className={validationErrors.password ? 'border-red-500' : ''}
                     />
+                    {validationErrors.password && (
+                      <p className="text-sm text-red-600 mt-1">{validationErrors.password}</p>
+                    )}
+                    {!user && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        La contraseña debe tener al menos 8 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

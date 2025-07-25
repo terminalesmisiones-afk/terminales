@@ -59,3 +59,61 @@ export const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
+
+// Password strength validation
+export const validatePasswordStrength = (password: string): { valid: boolean; error?: string } => {
+  if (password.length < 8) {
+    return { valid: false, error: 'La contraseña debe tener al menos 8 caracteres' };
+  }
+
+  if (!/(?=.*[a-z])/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos una letra minúscula' };
+  }
+
+  if (!/(?=.*[A-Z])/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos una letra mayúscula' };
+  }
+
+  if (!/(?=.*\d)/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos un número' };
+  }
+
+  if (!/(?=.*[@$!%*?&])/.test(password)) {
+    return { valid: false, error: 'La contraseña debe contener al menos un carácter especial (@$!%*?&)' };
+  }
+
+  return { valid: true };
+};
+
+// Phone number validation
+export const isValidPhone = (phone: string): boolean => {
+  const phoneRegex = /^[\+]?[\d\s\-\(\)]{8,20}$/;
+  return phoneRegex.test(phone);
+};
+
+// Name validation (no special characters except spaces, hyphens, apostrophes)
+export const isValidName = (name: string): boolean => {
+  const nameRegex = /^[a-zA-ZÀ-ÿ\s\-']{2,50}$/;
+  return nameRegex.test(name);
+};
+
+// Rate limiting helper
+export const createRateLimiter = (maxRequests: number, windowMs: number) => {
+  const requests = new Map<string, number[]>();
+
+  return (identifier: string): boolean => {
+    const now = Date.now();
+    const userRequests = requests.get(identifier) || [];
+    
+    // Remove old requests outside the window
+    const validRequests = userRequests.filter(time => now - time < windowMs);
+    
+    if (validRequests.length >= maxRequests) {
+      return false; // Rate limit exceeded
+    }
+    
+    validRequests.push(now);
+    requests.set(identifier, validRequests);
+    return true; // Request allowed
+  };
+};
