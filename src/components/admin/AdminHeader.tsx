@@ -14,6 +14,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import SupabaseNotificationModal from './SupabaseNotificationModal';
 import { useSupabaseNotifications } from '@/hooks/useSupabaseNotifications';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -23,12 +25,25 @@ const AdminHeader = ({ onMenuClick }: AdminHeaderProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
   const { notifications } = useSupabaseNotifications();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
   
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  const handleLogout = () => {
-    // Aquí iría la lógica de logout
-    window.location.href = '/admin/login';
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión correctamente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error al cerrar sesión",
+        variant: "destructive",
+      });
+    }
   };
 
   const openWebsite = () => {
