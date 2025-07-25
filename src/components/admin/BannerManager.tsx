@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+import { sanitizeInput, sanitizeHTML, validateFile } from '@/utils/security';
 
 interface Banner {
   id: number;
@@ -33,6 +35,7 @@ interface Banner {
 }
 
 const BannerManager = () => {
+  const { toast } = useToast();
   const [banners, setBanners] = useState<Banner[]>([
     {
       id: 1,
@@ -202,7 +205,7 @@ const BannerManager = () => {
                   <Input
                     id="title"
                     value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: sanitizeInput(e.target.value) }))}
                     required
                   />
                 </div>
@@ -242,6 +245,21 @@ const BannerManager = () => {
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
+                          // Validate file before upload
+                          const validation = validateFile(file, {
+                            maxSize: 5 * 1024 * 1024, // 5MB
+                            allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
+                          });
+
+                          if (!validation.valid) {
+                            toast({
+                              title: "Error",
+                              description: validation.error,
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+
                           try {
                             const { supabase } = await import('@/integrations/supabase/client');
                             
@@ -257,9 +275,18 @@ const BannerManager = () => {
                               .getPublicUrl(fileName);
 
                             setFormData(prev => ({ ...prev, imageUrl: publicUrl }));
+                            
+                            toast({
+                              title: "Imagen subida",
+                              description: "La imagen se ha subido correctamente",
+                            });
                           } catch (error) {
                             console.error('Error uploading file:', error);
-                            alert('Error al subir el archivo');
+                            toast({
+                              title: "Error",
+                              description: "Error al subir el archivo",
+                              variant: "destructive",
+                            });
                           }
                         }
                       }}
@@ -275,7 +302,7 @@ const BannerManager = () => {
                     <Textarea
                       id="htmlCode"
                       value={formData.htmlCode}
-                      onChange={(e) => setFormData(prev => ({ ...prev, htmlCode: e.target.value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, htmlCode: sanitizeHTML(e.target.value) }))}
                       placeholder="Pega aquí tu código HTML (ej. Google AdSense, scripts de terceros)"
                       rows={4}
                       required
