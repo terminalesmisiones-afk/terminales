@@ -66,16 +66,21 @@ const TerminalBasicInfoForm: React.FC<TerminalBasicInfoFormProps> = ({
           const fileName = `terminal-${Date.now()}-${file.name}`;
           const { data, error } = await supabase.storage
             .from('terminal-images')
-            .upload(fileName, file);
+            .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
 
           if (error) {
+            console.error('Supabase storage error:', error);
             throw error;
           }
 
           const { data: { publicUrl } } = supabase.storage
             .from('terminal-images')
-            .getPublicUrl(fileName);
+            .getPublicUrl(data.path);
 
+          console.log('Image uploaded successfully:', publicUrl);
           onFieldChange('image', publicUrl);
           
           toast({

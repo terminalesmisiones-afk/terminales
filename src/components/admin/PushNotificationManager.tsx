@@ -38,6 +38,20 @@ const PushNotificationManager = () => {
   });
 
   const [subscriberCount, setSubscriberCount] = useState(1580); // Mock data
+  
+  // Función para calcular el número correcto de usuarios basado en el segmento
+  const getSubscriberCountForSegment = (segment: string): number => {
+    switch (segment) {
+      case 'all':
+        return 1580;
+      case 'active':
+        return 1205;
+      case 'admin':
+        return 5;
+      default:
+        return 1580;
+    }
+  };
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSendNotification = async (e: React.FormEvent) => {
@@ -73,7 +87,7 @@ const PushNotificationManager = () => {
         title: newNotification.title,
         message: newNotification.message,
         sentAt: new Date().toLocaleString('es-AR'),
-        recipients: subscriberCount,
+        recipients: getSubscriberCountForSegment(newNotification.targetSegment),
         status: 'sent'
       };
 
@@ -188,21 +202,35 @@ const PushNotificationManager = () => {
                     input.onchange = async (e) => {
                       const file = (e.target as HTMLInputElement).files?.[0];
                       if (file) {
+                        // Validate file size
+                        if (file.size > 2 * 1024 * 1024) {
+                          alert('El archivo es demasiado grande. Máximo 2MB para íconos.');
+                          return;
+                        }
+                        
                         try {
                           const { supabase } = await import('@/integrations/supabase/client');
                           
                           const fileName = `notification-icon-${Date.now()}-${file.name}`;
                           const { data, error } = await supabase.storage
                             .from('terminal-images')
-                            .upload(fileName, file);
+                            .upload(fileName, file, {
+                              cacheControl: '3600',
+                              upsert: false
+                            });
 
-                          if (error) throw error;
+                          if (error) {
+                            console.error('Supabase storage error:', error);
+                            throw error;
+                          }
 
                           const { data: { publicUrl } } = supabase.storage
                             .from('terminal-images')
-                            .getPublicUrl(fileName);
+                            .getPublicUrl(data.path);
 
+                          console.log('Notification icon uploaded successfully:', publicUrl);
                           setNewNotification(prev => ({ ...prev, icon: publicUrl }));
+                          alert('Ícono subido exitosamente');
                         } catch (error) {
                           console.error('Error uploading icon:', error);
                           alert('Error al subir el ícono');
@@ -223,21 +251,11 @@ const PushNotificationManager = () => {
                 id="targetSegment"
                 value={newNotification.targetSegment}
                 onChange={(e) => {
-                  setNewNotification(prev => ({ ...prev, targetSegment: e.target.value }));
+                  const newSegment = e.target.value;
+                  setNewNotification(prev => ({ ...prev, targetSegment: newSegment }));
                   // Actualizar contador dinámico basado en segmento
-                  switch (e.target.value) {
-                    case 'all':
-                      setSubscriberCount(1580);
-                      break;
-                    case 'active':
-                      setSubscriberCount(1205);
-                      break;
-                    case 'admin':
-                      setSubscriberCount(5);
-                      break;
-                    default:
-                      setSubscriberCount(1580);
-                  }
+                  const newCount = getSubscriberCountForSegment(newSegment);
+                  setSubscriberCount(newCount);
                 }}
                 className="w-full p-2 border border-gray-300 rounded-md"
               >
@@ -261,7 +279,7 @@ const PushNotificationManager = () => {
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Enviar a {subscriberCount} usuarios
+                    Enviar a {getSubscriberCountForSegment(newNotification.targetSegment)} usuarios
                   </>
                 )}
               </Button>

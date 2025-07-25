@@ -266,14 +266,21 @@ const BannerManager = () => {
                             const fileName = `banner-${Date.now()}-${file.name}`;
                             const { data, error } = await supabase.storage
                               .from('terminal-images')
-                              .upload(fileName, file);
+                              .upload(fileName, file, {
+                                cacheControl: '3600',
+                                upsert: false
+                              });
 
-                            if (error) throw error;
+                            if (error) {
+                              console.error('Supabase storage error:', error);
+                              throw error;
+                            }
 
                             const { data: { publicUrl } } = supabase.storage
                               .from('terminal-images')
-                              .getPublicUrl(fileName);
+                              .getPublicUrl(data.path);
 
+                            console.log('Banner image uploaded successfully:', publicUrl);
                             setFormData(prev => ({ ...prev, imageUrl: publicUrl }));
                             
                             toast({

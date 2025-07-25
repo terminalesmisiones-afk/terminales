@@ -117,7 +117,19 @@ const SupabaseNotificationCenter = () => {
       {/* Lista de Notificaciones */}
       <Card>
         <CardHeader>
-          <CardTitle>Notificaciones Recientes</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Notificaciones Recientes</CardTitle>
+            {notifications.length > 0 && (
+              <Button
+                onClick={() => notifications.filter(n => !n.isRead).forEach(n => markAsRead(n.id))}
+                variant="outline"
+                size="sm"
+                disabled={unreadCount === 0}
+              >
+                Marcar Todas como Leídas
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-96">
@@ -136,7 +148,7 @@ const SupabaseNotificationCenter = () => {
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 rounded-lg border ${
+                    className={`p-4 rounded-lg border transition-all duration-200 ${
                       !notification.isRead 
                         ? getNotificationColor(notification.type)
                         : 'bg-gray-50 border-gray-200'
@@ -170,17 +182,29 @@ const SupabaseNotificationCenter = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => markAsRead(notification.id)}
-                            className="h-8 w-8 p-0"
+                            onClick={async () => {
+                              try {
+                                await markAsRead(notification.id);
+                              } catch (error) {
+                                console.error('Error marking notification as read:', error);
+                              }
+                            }}
+                            className="h-8 w-8 p-0 hover:bg-green-50"
                             title="Marcar como leída"
                           >
-                            <Check className="h-4 w-4" />
+                            <Check className="h-4 w-4 text-green-600" />
                           </Button>
                         )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteNotification(notification.id)}
+                          onClick={async () => {
+                            try {
+                              await deleteNotification(notification.id);
+                            } catch (error) {
+                              console.error('Error deleting notification:', error);
+                            }
+                          }}
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                           title="Eliminar notificación"
                         >

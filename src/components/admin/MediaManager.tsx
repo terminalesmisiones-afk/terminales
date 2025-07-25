@@ -109,11 +109,17 @@ const MediaManager = () => {
     if (files && files.length > 0) {
       const file = files[0];
       
+      // Validation
+      if (file.size > 10 * 1024 * 1024) {
+        alert('El archivo es demasiado grande. Máximo 10MB.');
+        return;
+      }
+      
       try {
         setLoading(true);
         
         // Upload to Supabase Storage
-        const fileName = `${Date.now()}-${file.name}`;
+        const fileName = `media-${Date.now()}-${file.name}`;
         const { data, error } = await supabase.storage
           .from('terminal-images')
           .upload(fileName, file, {
@@ -121,7 +127,10 @@ const MediaManager = () => {
             upsert: false
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase storage error:', error);
+          throw error;
+        }
 
         // Get public URL
         const { data: urlData } = supabase.storage
@@ -141,6 +150,7 @@ const MediaManager = () => {
           terminal: uploadData.terminal || 'general'
         };
         
+        console.log('Media file uploaded successfully:', urlData.publicUrl);
         setMediaFiles(prev => [...prev, newFile]);
         setShowUploadForm(false);
         setUploadData({
@@ -151,6 +161,8 @@ const MediaManager = () => {
           description: '',
           terminal: ''
         });
+        
+        alert('Archivo subido exitosamente');
       } catch (error) {
         console.error('Error uploading file:', error);
         alert('Error al subir el archivo. Inténtalo de nuevo.');

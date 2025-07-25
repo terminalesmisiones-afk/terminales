@@ -24,9 +24,17 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   const markerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    console.log('MapLocationPicker: Actualizando coordenadas:', { latitude, longitude });
     setCurrentLat(latitude);
     setCurrentLng(longitude);
   }, [latitude, longitude]);
+  
+  // Notificar cambios de ubicación solo cuando sea necesario
+  useEffect(() => {
+    if (currentLat !== latitude || currentLng !== longitude) {
+      onLocationChange(currentLat, currentLng);
+    }
+  }, [currentLat, currentLng]);
 
   // Map interaction handlers
   useEffect(() => {
@@ -132,16 +140,16 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   const handleManualLatChange = (value: string) => {
     const lat = parseFloat(value);
     if (!isNaN(lat)) {
+      console.log('Cambio manual de latitud:', lat);
       setCurrentLat(lat);
-      onLocationChange(lat, currentLng);
     }
   };
 
   const handleManualLngChange = (value: string) => {
     const lng = parseFloat(value);
     if (!isNaN(lng)) {
+      console.log('Cambio manual de longitud:', lng);
       setCurrentLng(lng);
-      onLocationChange(currentLat, lng);
     }
   };
 
@@ -161,7 +169,6 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         setCurrentLat(newLat);
         setCurrentLng(newLng);
         setZoom(16);
-        onLocationChange(newLat, newLng);
         
         // Centrar el marcador en el mapa
         setTimeout(() => {
