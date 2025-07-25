@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { sanitizeInput, sanitizeHTML, isValidEmail, isValidPhone, isValidURL, validateFile } from '@/utils/security';
 
 interface TransportCompany {
   id: number;
@@ -43,6 +45,8 @@ const TransportCompaniesManager = () => {
     ticketOffices: '',
     isActive: true
   });
+  
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Detect mobile screen
   const [isMobile, setIsMobile] = useState(false);
@@ -164,11 +168,67 @@ const TransportCompaniesManager = () => {
     setShowModal(true);
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validate name
+    if (!formData.name.trim()) {
+      errors.name = 'El nombre de la empresa es requerido';
+    } else if (formData.name.trim().length < 2) {
+      errors.name = 'El nombre debe tener al menos 2 caracteres';
+    }
+
+    // Validate email
+    if (formData.email && !isValidEmail(formData.email)) {
+      errors.email = 'El formato del email no es válido';
+    }
+
+    // Validate phone
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      errors.phone = 'El formato del teléfono no es válido';
+    }
+
+    // Validate WhatsApp
+    if (formData.whatsapp && !isValidPhone(formData.whatsapp)) {
+      errors.whatsapp = 'El formato del WhatsApp no es válido';
+    }
+
+    // Validate website
+    if (formData.website && !isValidURL(formData.website)) {
+      errors.website = 'El formato de la URL no es válido';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSave = () => {
+    if (!validateForm()) {
+      toast({
+        title: "Error de validación",
+        description: "Por favor, corrige los errores en el formulario.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Sanitize all text inputs
+    const sanitizedData = {
+      ...formData,
+      name: sanitizeInput(formData.name.trim()),
+      phone: sanitizeInput(formData.phone.trim()),
+      whatsapp: sanitizeInput(formData.whatsapp.trim()),
+      email: sanitizeInput(formData.email.trim().toLowerCase()),
+      address: sanitizeInput(formData.address.trim()),
+      website: sanitizeInput(formData.website.trim()),
+      description: sanitizeHTML(formData.description),
+      ticketOffices: sanitizeInput(formData.ticketOffices.trim())
+    };
+
     if (editingCompany) {
       const updatedCompanies = companies.map(c =>
         c.id === editingCompany.id ? {
-          ...formData,
+          ...sanitizedData,
           id: editingCompany.id,
           lastUpdated: new Date().toISOString().split('T')[0]
         } : c
@@ -176,7 +236,7 @@ const TransportCompaniesManager = () => {
       saveCompanies(updatedCompanies);
     } else {
       const newCompany: TransportCompany = {
-        ...formData,
+        ...sanitizedData,
         id: Date.now(),
         lastUpdated: new Date().toISOString().split('T')[0]
       };
@@ -184,6 +244,7 @@ const TransportCompaniesManager = () => {
     }
 
     setShowModal(false);
+    setValidationErrors({});
     toast({
       title: "Empresa guardada",
       description: "La empresa se ha guardado correctamente.",
@@ -204,6 +265,21 @@ const TransportCompaniesManager = () => {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
+        // Validate file
+        const validation = validateFile(file, {
+          maxSize: 2 * 1024 * 1024, // 2MB
+          allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
+        });
+
+        if (!validation.valid) {
+          toast({
+            title: "Error en el archivo",
+            description: validation.error,
+            variant: "destructive"
+          });
+          return;
+        }
+
         const mockUrl = `/lovable-uploads/${file.name}`;
         setFormData(prev => ({ ...prev, logo: mockUrl }));
         toast({
@@ -424,7 +500,15 @@ const TransportCompaniesManager = () => {
             </DialogTitle>
           </DialogHeader>
 
-          <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 gap-6'} py-4`}>
+          {Object.keys(validationErrors).length > 0 && (
+            <Alert className="mx-6 border-red-200 bg-red-50">
+              <AlertDescription className="text-red-700">
+                Por favor, corrige los errores en el formulario antes de continuar.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 gap-6'} py-4 px-6`}>
             <div className="space-y-4">
               <div>
                 <Label htmlFor="name" className="text-sm font-medium">Nombre de la Empresa</Label>
@@ -434,8 +518,11 @@ const TransportCompaniesManager = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Ej: Empresa Crucero del Norte"
                   required
-                  className="mt-1"
+                  className={`mt-1 ${validationErrors.name ? 'border-red-500' : ''}`}
                 />
+                {validationErrors.name && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -475,8 +562,11 @@ const TransportCompaniesManager = () => {
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="Ej: +54 376 442-7788"
-                  className="mt-1"
+                  className={`mt-1 ${validationErrors.phone ? 'border-red-500' : ''}`}
                 />
+                {validationErrors.phone && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.phone}</p>
+                )}
               </div>
 
               <div>
@@ -486,8 +576,11 @@ const TransportCompaniesManager = () => {
                   value={formData.whatsapp}
                   onChange={(e) => setFormData(prev => ({ ...prev, whatsapp: e.target.value }))}
                   placeholder="Ej: +54 9 376 442-7788"
-                  className="mt-1"
+                  className={`mt-1 ${validationErrors.whatsapp ? 'border-red-500' : ''}`}
                 />
+                {validationErrors.whatsapp && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.whatsapp}</p>
+                )}
               </div>
 
               <div>
@@ -498,8 +591,11 @@ const TransportCompaniesManager = () => {
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="Ej: info@empresa.com"
-                  className="mt-1"
+                  className={`mt-1 ${validationErrors.email ? 'border-red-500' : ''}`}
                 />
+                {validationErrors.email && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.email}</p>
+                )}
               </div>
             </div>
 
@@ -522,8 +618,11 @@ const TransportCompaniesManager = () => {
                   value={formData.website}
                   onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
                   placeholder="https://empresa.com"
-                  className="mt-1"
+                  className={`mt-1 ${validationErrors.website ? 'border-red-500' : ''}`}
                 />
+                {validationErrors.website && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.website}</p>
+                )}
               </div>
 
               <div>

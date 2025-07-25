@@ -281,6 +281,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      log_security_event: {
+        Args: {
+          p_action: string
+          p_resource_type: string
+          p_resource_id?: string
+          p_details?: Json
+        }
+        Returns: undefined
+      }
       promote_to_admin: {
         Args: { user_email: string }
         Returns: undefined

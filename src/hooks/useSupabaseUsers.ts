@@ -29,12 +29,17 @@ export const useSupabaseUsers = () => {
 
   const logSecurityEvent = async (action: string, details?: any) => {
     try {
-      await supabase.rpc('log_security_event', {
-        p_action: action,
-        p_resource_type: 'user',
-        p_resource_id: details?.user_id || null,
-        p_details: details
-      });
+      const { error } = await supabase
+        .from('security_logs')
+        .insert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          action,
+          resource_type: 'user',
+          resource_id: details?.user_id || null,
+          details
+        });
+      
+      if (error) console.error('Failed to log security event:', error);
     } catch (err) {
       console.error('Failed to log security event:', err);
     }
