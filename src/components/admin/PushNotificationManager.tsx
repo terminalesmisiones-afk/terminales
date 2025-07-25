@@ -37,7 +37,7 @@ const PushNotificationManager = () => {
     targetSegment: 'all'
   });
 
-  const [subscriberCount] = useState(1580); // Mock data
+  const [subscriberCount, setSubscriberCount] = useState(1580); // Mock data
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSendNotification = async (e: React.FormEvent) => {
@@ -169,13 +169,52 @@ const PushNotificationManager = () => {
             </div>
             
             <div>
-              <Label htmlFor="icon">Ícono (URL)</Label>
-              <Input
-                id="icon"
-                value={newNotification.icon}
-                onChange={(e) => setNewNotification(prev => ({ ...prev, icon: e.target.value }))}
-                placeholder="/favicon.ico"
-              />
+              <Label htmlFor="icon">Ícono</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="icon"
+                  value={newNotification.icon}
+                  onChange={(e) => setNewNotification(prev => ({ ...prev, icon: e.target.value }))}
+                  placeholder="/favicon.ico"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = async (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        try {
+                          const { supabase } = await import('@/integrations/supabase/client');
+                          
+                          const fileName = `notification-icon-${Date.now()}-${file.name}`;
+                          const { data, error } = await supabase.storage
+                            .from('terminal-images')
+                            .upload(fileName, file);
+
+                          if (error) throw error;
+
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('terminal-images')
+                            .getPublicUrl(fileName);
+
+                          setNewNotification(prev => ({ ...prev, icon: publicUrl }));
+                        } catch (error) {
+                          console.error('Error uploading icon:', error);
+                          alert('Error al subir el ícono');
+                        }
+                      }
+                    };
+                    input.click();
+                  }}
+                >
+                  Subir
+                </Button>
+              </div>
             </div>
             
             <div>
@@ -183,7 +222,23 @@ const PushNotificationManager = () => {
               <select
                 id="targetSegment"
                 value={newNotification.targetSegment}
-                onChange={(e) => setNewNotification(prev => ({ ...prev, targetSegment: e.target.value }))}
+                onChange={(e) => {
+                  setNewNotification(prev => ({ ...prev, targetSegment: e.target.value }));
+                  // Actualizar contador dinámico basado en segmento
+                  switch (e.target.value) {
+                    case 'all':
+                      setSubscriberCount(1580);
+                      break;
+                    case 'active':
+                      setSubscriberCount(1205);
+                      break;
+                    case 'admin':
+                      setSubscriberCount(5);
+                      break;
+                    default:
+                      setSubscriberCount(1580);
+                  }
+                }}
                 className="w-full p-2 border border-gray-300 rounded-md"
               >
                 <option value="all">Todos los usuarios</option>

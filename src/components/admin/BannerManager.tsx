@@ -239,12 +239,28 @@ const BannerManager = () => {
                       id="imageFile"
                       type="file"
                       accept="image/*"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          // En producción, aquí subirías el archivo
-                          const mockUrl = URL.createObjectURL(file);
-                          setFormData(prev => ({ ...prev, imageUrl: mockUrl }));
+                          try {
+                            const { supabase } = await import('@/integrations/supabase/client');
+                            
+                            const fileName = `banner-${Date.now()}-${file.name}`;
+                            const { data, error } = await supabase.storage
+                              .from('terminal-images')
+                              .upload(fileName, file);
+
+                            if (error) throw error;
+
+                            const { data: { publicUrl } } = supabase.storage
+                              .from('terminal-images')
+                              .getPublicUrl(fileName);
+
+                            setFormData(prev => ({ ...prev, imageUrl: publicUrl }));
+                          } catch (error) {
+                            console.error('Error uploading file:', error);
+                            alert('Error al subir el archivo');
+                          }
                         }
                       }}
                       required={!formData.imageUrl}

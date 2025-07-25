@@ -162,9 +162,22 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         setCurrentLng(newLng);
         setZoom(16);
         onLocationChange(newLat, newLng);
+        
+        // Centrar el marcador en el mapa
+        setTimeout(() => {
+          const mapContainer = document.querySelector('.relative.w-full.h-80') as HTMLElement;
+          const draggableMarker = mapContainer?.querySelector('[title="Arrastra para cambiar la ubicación"]') as HTMLElement;
+          if (draggableMarker) {
+            draggableMarker.style.left = '50%';
+            draggableMarker.style.top = '50%';
+          }
+        }, 100);
+      } else {
+        alert('No se pudo encontrar la ubicación de San Vicente');
       }
     } catch (error) {
       console.error('Error buscando ubicación:', error);
+      alert('Error al buscar la ubicación');
     }
   };
 

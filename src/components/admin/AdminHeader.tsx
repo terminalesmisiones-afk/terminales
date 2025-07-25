@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
-import NotificationCenter from './NotificationCenter';
+import SupabaseNotificationModal from './SupabaseNotificationModal';
+import { useSupabaseNotifications } from '@/hooks/useSupabaseNotifications';
 
 interface AdminHeaderProps {
   onMenuClick: () => void;
@@ -21,6 +22,9 @@ interface AdminHeaderProps {
 const AdminHeader: React.FC<AdminHeaderProps> = ({ onMenuClick }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
+  const { notifications } = useSupabaseNotifications();
+  
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const handleLogout = () => {
     // Aquí iría la lógica de logout
@@ -86,12 +90,14 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ onMenuClick }) => {
               className="relative"
             >
               <Bell className="h-5 w-5" />
-              <Badge
-                variant="destructive"
-                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0"
-              >
-                2
-              </Badge>
+              {unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0"
+                >
+                  {unreadCount}
+                </Badge>
+              )}
             </Button>
 
             {/* Menu de Usuario */}
@@ -126,7 +132,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ onMenuClick }) => {
         </div>
       </header>
 
-      <NotificationCenter
+      <SupabaseNotificationModal
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />

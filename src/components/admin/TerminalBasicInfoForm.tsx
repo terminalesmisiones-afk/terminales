@@ -36,21 +36,44 @@ const TerminalBasicInfoForm: React.FC<TerminalBasicInfoFormProps> = ({
 }) => {
   const { toast } = useToast();
 
-  const handleImageUpload = () => {
+  const handleImageUpload = async () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // Simular upload - en producción sería una llamada a API
-        const mockUrl = `/lovable-uploads/${file.name}`;
-        onFieldChange('image', mockUrl);
-        
-        toast({
-          title: "Imagen subida",
-          description: `La imagen ${file.name} se ha subido correctamente.`,
-        });
+        try {
+          // Importar el hook de Supabase para upload real
+          const { supabase } = await import('@/integrations/supabase/client');
+          
+          const fileName = `terminal-${Date.now()}-${file.name}`;
+          const { data, error } = await supabase.storage
+            .from('terminal-images')
+            .upload(fileName, file);
+
+          if (error) {
+            throw error;
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('terminal-images')
+            .getPublicUrl(fileName);
+
+          onFieldChange('image', publicUrl);
+          
+          toast({
+            title: "Imagen subida",
+            description: `La imagen ${file.name} se ha subido correctamente.`,
+          });
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          toast({
+            title: "Error",
+            description: "Error al subir la imagen. Intenta nuevamente.",
+            variant: "destructive",
+          });
+        }
       }
     };
     input.click();

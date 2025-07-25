@@ -100,21 +100,41 @@ const SeoManager = () => {
     }
   };
 
-  const handleImageUpload = (field: string) => {
+  const handleImageUpload = async (field: string) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // Simular upload - en producción sería una llamada a API
-        const mockUrl = `/lovable-uploads/${file.name}`;
-        handleInputChange(field, mockUrl);
-        
-        toast({
-          title: "Imagen subida",
-          description: `La imagen ${file.name} se ha subido correctamente.`,
-        });
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          
+          const fileName = `seo-${field}-${Date.now()}-${file.name}`;
+          const { data, error } = await supabase.storage
+            .from('terminal-images')
+            .upload(fileName, file);
+
+          if (error) throw error;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('terminal-images')
+            .getPublicUrl(fileName);
+
+          handleInputChange(field, publicUrl);
+          
+          toast({
+            title: "Imagen subida",
+            description: `La imagen ${file.name} se ha subido correctamente.`,
+          });
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          toast({
+            title: "Error",
+            description: "Error al subir la imagen. Intenta nuevamente.",
+            variant: "destructive",
+          });
+        }
       }
     };
     input.click();
