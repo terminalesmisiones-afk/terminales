@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Menu, Bell, User, LogOut, Settings, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ interface AdminHeaderProps {
   onMenuClick: () => void;
 }
 
-const AdminHeader: React.FC<AdminHeaderProps> = ({ onMenuClick }) => {
+const AdminHeader = ({ onMenuClick }: AdminHeaderProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
   const { notifications } = useSupabaseNotifications();
