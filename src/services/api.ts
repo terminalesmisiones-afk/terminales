@@ -439,5 +439,57 @@ export const api = {
         });
         if (!response.ok) throw new Error('Failed to mark messages as read');
         return response.json();
+    },
+    // SEO API
+    getPublicSeo: async () => {
+        const response = await fetch(`${API_URL}/seo`);
+        if (!response.ok) throw new Error('Failed to fetch SEO settings');
+        return response.json();
+    },
+
+    // Notifications API
+    getNotifications: async () => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/notifications`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Error al cargar notificaciones');
+        return response.json();
+    },
+
+    createNotification: async (data: { title: string, message: string, type: string }) => {
+        const token = localStorage.getItem('token');
+        await fetch(`${API_URL}/notifications`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+    },
+
+    markNotificationRead: async (id: string) => {
+        const token = localStorage.getItem('token');
+        await fetch(`${API_URL}/notifications/${id}/read`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    deleteNotification: async (id: string) => {
+        const token = localStorage.getItem('token');
+        await fetch(`${API_URL}/notifications/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    clearNotifications: async () => {
+        const token = localStorage.getItem('token');
+        await fetch(`${API_URL}/notifications`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
     }
 };

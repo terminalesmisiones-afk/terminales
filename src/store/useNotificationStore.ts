@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { api } from '@/services/api';
 
 interface Notification {
     id: string;
@@ -33,13 +34,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
             const token = localStorage.getItem('token');
             if (!token) return;
 
-            const response = await fetch('/api/notifications', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!response.ok) throw new Error('Error al cargar notificaciones');
-
-            const data = await response.json();
+            const data = await api.getNotifications();
             const formattedNotifications: Notification[] = data.map((n: any) => ({
                 id: n.id,
                 title: n.title,
@@ -63,14 +58,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     addNotification: async (title, message, type = 'info') => {
         try {
             const token = localStorage.getItem('token');
-            await fetch('/api/notifications', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ title, message, type })
-            });
+            await api.createNotification({ title, message, type });
             get().fetchNotifications();
         } catch (error) {
             console.error(error);
@@ -80,10 +68,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     markAsRead: async (id) => {
         try {
             const token = localStorage.getItem('token');
-            await fetch(`/api/notifications/${id}/read`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await api.markNotificationRead(id);
 
             // Optimistic update
             set((state) => {
@@ -103,10 +88,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     deleteNotification: async (id) => {
         try {
             const token = localStorage.getItem('token');
-            await fetch(`/api/notifications/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await api.deleteNotification(id);
 
             // Optimistic update
             set((state) => {
@@ -124,10 +106,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     clearAllNotifications: async () => {
         try {
             const token = localStorage.getItem('token');
-            await fetch('/api/notifications', {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await api.clearNotifications();
 
             set({ notifications: [], unreadCount: 0 });
         } catch (error) {

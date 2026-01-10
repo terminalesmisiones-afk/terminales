@@ -2,13 +2,13 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { api } from '@/services/api';
+
 const ScriptInjector: React.FC = () => {
     const { data: seoSettings } = useQuery({
         queryKey: ['seo-public'],
         queryFn: async () => {
-            const res = await fetch('/api/seo');
-            if (!res.ok) throw new Error('Failed to fetch SEO settings');
-            return res.json();
+            return api.getPublicSeo();
         }
     });
 
