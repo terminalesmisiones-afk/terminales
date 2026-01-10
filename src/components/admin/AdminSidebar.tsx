@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { api } from '@/services/api';
 import { Link, useLocation } from 'react-router-dom';
 import { X, Home, MapPin, Users, Search, Image, BarChart3, Route, Truck, Share2, Bell, Send, FileText, CreditCard, UserCheck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,18 +28,9 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     const fetchPendingCount = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
-        const res = await fetch(`/api/admin/registrations?t=${new Date().getTime()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const pending = data.filter((r: any) => r.status === 'pending').length;
-          setPendingCount(pending);
-        }
+        const data = await api.getPendingRegistrations();
+        const pending = data.filter((r: any) => r.status === 'pending').length;
+        setPendingCount(pending);
       } catch (error) {
         console.error('Error fetching pending registrations:', error);
       }
@@ -54,23 +46,14 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     const fetchUnreadSupport = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
         // Only fetch for admins
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
         if (userData.role !== 'admin') return;
 
-        const res = await fetch(`/api/support/conversations`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (res.ok) {
-          const conversations = await res.json();
-          // Sum up unread_count from all conversations
-          const totalUnread = conversations.reduce((sum: number, conv: any) => sum + (conv.unread_count || 0), 0);
-          setUnreadSupportCount(totalUnread);
-        }
+        const conversations = await api.getSupportConversations();
+        // Sum up unread_count from all conversations
+        const totalUnread = conversations.reduce((sum: number, conv: any) => sum + (conv.unread_count || 0), 0);
+        setUnreadSupportCount(totalUnread);
       } catch (error) {
         console.error('Error fetching unread support messages:', error);
       }

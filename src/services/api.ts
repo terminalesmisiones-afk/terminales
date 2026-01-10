@@ -286,6 +286,15 @@ export const api = {
         return response.json();
     },
 
+    getPendingRegistrations: async () => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/admin/registrations?t=${new Date().getTime()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch pending registrations');
+        return response.json();
+    },
+
     getDashboardStats: async () => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/admin/stats`, {
