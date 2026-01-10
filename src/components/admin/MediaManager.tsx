@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, Image, Trash2, Edit, Eye, Download, Link } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,42 +42,10 @@ const MediaManager = () => {
   // Fetch files from Supabase Storage
   useEffect(() => {
     const fetchFiles = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase.storage
-          .from('terminal-images')
-          .list();
-
-        if (error) {
-          console.error('Error fetching files:', error);
-          return;
-        }
-
-        const files: MediaFile[] = data?.map((file, index) => {
-          const { data: urlData } = supabase.storage
-            .from('terminal-images')
-            .getPublicUrl(file.name);
-
-          return {
-            id: index + 1,
-            name: file.name,
-            url: urlData.publicUrl,
-            type: file.metadata?.mimetype || 'unknown',
-            size: file.metadata?.size ? `${Math.round(file.metadata.size / 1024)} KB` : 'N/A',
-            category: 'terminals', // Default category, can be enhanced later
-            altText: file.name,
-            description: '',
-            uploadDate: new Date(file.created_at).toISOString().split('T')[0],
-            terminal: 'general'
-          };
-        }) || [];
-
-        setMediaFiles(files);
-      } catch (error) {
-        console.error('Error fetching media files:', error);
-      } finally {
-        setLoading(false);
-      }
+      // TODO: Implement list files endpoint on server
+      // For now, we only show what we upload in this session or implement persistence later
+      setLoading(false);
+      setMediaFiles([]);
     };
 
     fetchFiles();
@@ -100,7 +68,7 @@ const MediaManager = () => {
     { value: 'Eldorado', label: 'Eldorado' }
   ];
 
-  const filteredFiles = mediaFiles.filter(file => 
+  const filteredFiles = mediaFiles.filter(file =>
     selectedCategory === 'all' || file.category === selectedCategory
   );
 
@@ -108,39 +76,23 @@ const MediaManager = () => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      
+
       // Validation
       if (file.size > 10 * 1024 * 1024) {
         alert('El archivo es demasiado grande. Máximo 10MB.');
         return;
       }
-      
+
       try {
         setLoading(true);
-        
-        // Upload to Supabase Storage
-        const fileName = `media-${Date.now()}-${file.name}`;
-        const { data, error } = await supabase.storage
-          .from('terminal-images')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
 
-        if (error) {
-          console.error('Supabase storage error:', error);
-          throw error;
-        }
+        // Upload to Local Server
+        const response = await api.uploadImage(file);
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('terminal-images')
-          .getPublicUrl(data.path);
-        
         const newFile: MediaFile = {
           id: Date.now(),
           name: uploadData.name || file.name,
-          url: urlData.publicUrl,
+          url: response.url,
           type: file.type,
           size: `${Math.round(file.size / 1024)} KB`,
           category: uploadData.category,
@@ -149,8 +101,8 @@ const MediaManager = () => {
           uploadDate: new Date().toISOString().split('T')[0],
           terminal: uploadData.terminal || 'general'
         };
-        
-        console.log('Media file uploaded successfully:', urlData.publicUrl);
+
+        console.log('Media file uploaded successfully:', response.url);
         setMediaFiles(prev => [...prev, newFile]);
         setShowUploadForm(false);
         setUploadData({
@@ -161,7 +113,7 @@ const MediaManager = () => {
           description: '',
           terminal: ''
         });
-        
+
         alert('Archivo subido exitosamente');
       } catch (error) {
         console.error('Error uploading file:', error);
@@ -186,7 +138,7 @@ const MediaManager = () => {
         uploadDate: new Date().toISOString().split('T')[0],
         terminal: uploadData.terminal || 'general'
       };
-      
+
       setMediaFiles(prev => [...prev, newFile]);
       setShowUploadForm(false);
       setUploadData({
@@ -215,16 +167,16 @@ const MediaManager = () => {
 
   const handleUpdate = () => {
     if (editingFile) {
-      setMediaFiles(prev => prev.map(file => 
-        file.id === editingFile.id 
+      setMediaFiles(prev => prev.map(file =>
+        file.id === editingFile.id
           ? {
-              ...file,
-              name: uploadData.name,
-              category: uploadData.category,
-              altText: uploadData.altText,
-              description: uploadData.description,
-              terminal: uploadData.terminal
-            }
+            ...file,
+            name: uploadData.name,
+            category: uploadData.category,
+            altText: uploadData.altText,
+            description: uploadData.description,
+            terminal: uploadData.terminal
+          }
           : file
       ));
       setEditingFile(null);
@@ -358,7 +310,7 @@ const MediaManager = () => {
                   </Select>
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="description">Descripción</Label>
                 <Textarea
@@ -397,9 +349,9 @@ const MediaManager = () => {
               )}
 
               <div className="flex justify-end gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => {
                     setShowUploadForm(false);
                     setEditingFile(null);
@@ -523,8 +475,8 @@ const MediaManager = () => {
           <Image className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No hay archivos</h3>
           <p className="text-gray-500 mb-4">
-            {selectedCategory === 'all' 
-              ? 'Sube tu primer archivo para comenzar' 
+            {selectedCategory === 'all'
+              ? 'Sube tu primer archivo para comenzar'
               : `No hay archivos en la categoría "${categories.find(c => c.value === selectedCategory)?.label}"`
             }
           </p>

@@ -427,6 +427,26 @@ export const api = {
         return response.json();
     },
 
+    uploadImage: async (file: File) => {
+        const token = localStorage.getItem('token');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${API_URL}/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to upload image');
+        }
+        return response.json();
+    },
+
     markMessagesAsRead: async (userId: string) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/support/messages/mark-read`, {
