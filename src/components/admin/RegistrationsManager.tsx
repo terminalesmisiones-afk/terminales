@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -42,11 +43,7 @@ const RegistrationsManager = () => {
 
     const loadRegistrations = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`/api/admin/registrations?t=${new Date().getTime()}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await res.json();
+            const data = await api.getPendingRegistrations();
             setRegistrations(data);
         } catch (error) {
             toast({ title: 'Error', description: 'Error al cargar solicitudes', variant: 'destructive' });
@@ -61,13 +58,7 @@ const RegistrationsManager = () => {
 
     const handleApprove = async (id: string) => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`/api/admin/registrations/${id}/approve`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!res.ok) throw new Error('Error al aprobar');
+            await api.approveRegistration(id);
 
             toast({ title: 'Aprobado', description: 'Usuario aprobado exitosamente' });
             loadRegistrations();
@@ -80,17 +71,7 @@ const RegistrationsManager = () => {
         if (!selectedReg) return;
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`/api/admin/registrations/${selectedReg.id}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ reason: rejectReason })
-            });
-
-            if (!res.ok) throw new Error('Error al rechazar');
+            await api.rejectRegistration(selectedReg.id, rejectReason);
 
             toast({ title: 'Rechazado', description: 'Solicitud rechazada' });
             setShowRejectDialog(false);

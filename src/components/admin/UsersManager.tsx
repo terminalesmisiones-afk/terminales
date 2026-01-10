@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -60,11 +61,7 @@ const UsersManager = () => {
 
   const loadUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/users?t=${new Date().getTime()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
+      const data = await api.getUsers();
       setUsers(data);
     } catch (error) {
       toast({ title: 'Error', description: 'Error al cargar usuarios', variant: 'destructive' });
@@ -75,8 +72,7 @@ const UsersManager = () => {
 
   const loadTerminals = async () => {
     try {
-      const res = await fetch('/api/terminals');
-      const data = await res.json();
+      const data = await api.getTerminals();
       setTerminals(data);
     } catch (error) {
       console.error('Error loading terminals:', error);
@@ -106,24 +102,7 @@ const UsersManager = () => {
       console.log('Attempting to update user:', selectedUser.id);
       console.log('Edit form data:', editForm);
 
-      const token = localStorage.getItem('token');
-      // Usar el nuevo endpoint PATCH alternativo
-      const res = await fetch(`/api/admin/users/${selectedUser.id}/update`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editForm)
-      });
-
-      console.log('Response status:', res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Error response:', errorText);
-        throw new Error('Error al actualizar');
-      }
+      await api.updateUser(selectedUser.id, editForm);
 
       toast({ title: 'Actualizado', description: 'Usuario actualizado exitosamente' });
       setShowEditDialog(false);
@@ -158,20 +137,7 @@ const UsersManager = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/users/${selectedUser.id}/password`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ newPassword: passwordForm.newPassword })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Error al cambiar contraseña');
-      }
+      await api.updateUserPassword(selectedUser.id, passwordForm.newPassword);
 
       toast({
         title: 'Éxito',
@@ -193,13 +159,7 @@ const UsersManager = () => {
     if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/users/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!res.ok) throw new Error('Error al eliminar');
+      await api.deleteUser(id);
 
       toast({ title: 'Eliminado', description: 'Usuario eliminado' });
       loadUsers();

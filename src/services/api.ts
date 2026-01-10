@@ -276,6 +276,20 @@ export const api = {
         return response.json();
     },
 
+    updateUserPassword: async (id: number | string, newPassword: string) => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/admin/users/${id}/password`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ newPassword })
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to update password');
+        }
+        return response.json();
+    },
+
     deleteUser: async (id: number | string) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/admin/users/${id}`, {
@@ -292,6 +306,30 @@ export const api = {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) throw new Error('Failed to fetch pending registrations');
+        return response.json();
+    },
+
+    approveRegistration: async (id: string) => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/admin/registrations/${id}/approve`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to approve registration');
+        return response.json();
+    },
+
+    rejectRegistration: async (id: string, reason: string) => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/admin/registrations/${id}/reject`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason })
+        });
+        if (!response.ok) throw new Error('Failed to reject registration');
         return response.json();
     },
 
