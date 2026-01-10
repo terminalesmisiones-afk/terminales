@@ -218,11 +218,11 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     const { email, password, captchaToken } = req.body;
 
     // Verify Captcha
-    // Verify Captcha (DISABLED TEMPORARILY FOR MIGRATION)
-    // const isHuman = await verifyRecaptcha(captchaToken);
-    // if (!isHuman) {
-    //     return res.status(400).json({ error: 'Verificación de seguridad fallida (reCAPTCHA). Por favor recarga e intenta de nuevo.' });
-    // }
+    // Verify Captcha
+    const isHuman = await verifyRecaptcha(captchaToken);
+    if (!isHuman) {
+        return res.status(400).json({ error: 'Verificación de seguridad fallida (reCAPTCHA). Por favor recarga e intenta de nuevo.' });
+    }
 
     db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
         if (err) return res.status(500).json({ error: err.message });
