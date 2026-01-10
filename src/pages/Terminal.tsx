@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { api } from '@/services/api';
-import { MapPin, Clock, Info, ArrowLeft } from 'lucide-react';
+import { MapPin, Clock, Info, ArrowLeft, TrendingUp } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -355,6 +355,22 @@ const Terminal = () => {
             <div>
               <AdBannerSlot slot="sidebar-map-bottom" />
             </div>
+
+            {/* Publicitá Acá Call to Action */}
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+              <CardContent className="p-6 text-center">
+                <TrendingUp className="h-8 w-8 text-primary mx-auto mb-3" />
+                <h3 className="font-bold text-lg mb-2">¿Querés destacar tu negocio?</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Llega a miles de pasajeros que visitan esta terminal cada día.
+                </p>
+                <Link to="/publicidad">
+                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
+                    Publicitá Acá
+                  </span>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
-
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { TrendingUp } from 'lucide-react';
 import SearchAutocomplete from './SearchAutocomplete';
 
 interface HeroSectionProps {
@@ -29,6 +30,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onSearch, onNearestTerminal }
           {/* Autocomplete Search */}
           <div className="relative z-10">
             <SearchAutocomplete onSearch={onSearch} />
+            <div className="mt-8">
+              <Link to="/publicidad" className="inline-flex items-center gap-2 text-white/90 hover:text-white hover:underline transition-all">
+                <TrendingUp className="h-5 w-5" />
+                <span>¿Tenes una empresa? Publicitá acá</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
