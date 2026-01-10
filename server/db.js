@@ -127,6 +127,13 @@ db.serialize(() => {
     ip_address TEXT
   )`);
 
+  // App Settings Table
+  db.run(`CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at TEXT
+  )`);
+
   // Pages Table (CMS)
   db.run(`CREATE TABLE IF NOT EXISTS pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
