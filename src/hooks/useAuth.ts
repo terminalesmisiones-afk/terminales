@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
+
+interface User {
+  id: string;
+  email: string;
+  role: string;
+}
+
+interface Session {
+  access_token: string;
+  user: User;
+}
 
 interface AuthState {
   user: User | null;
@@ -17,73 +27,66 @@ export const useAuth = () => {
     isAdmin: false
   });
 
-  const checkAdminRole = useCallback(async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .single();
-      
-      return !!data;
-    } catch (error) {
-      console.error('Error checking admin role:', error);
-      return false;
+  const checkSession = useCallback(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setAuthState({
+          user,
+          session: { access_token: token, user },
+          loading: false,
+          isAdmin: user.role === 'admin'
+        });
+      } catch (e) {
+        console.error('Error parsing user session', e);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setAuthState(prev => ({ ...prev, loading: false }));
+      }
+    } else {
+      setAuthState(prev => ({ ...prev, loading: false }));
     }
   }, []);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        const user = session?.user ?? null;
-        let isAdmin = false;
+    checkSession();
+  }, [checkSession]);
 
-        if (user) {
-          // Defer admin check to prevent blocking
-          setTimeout(async () => {
-            const adminStatus = await checkAdminRole(user.id);
-            setAuthState(prev => ({ ...prev, isAdmin: adminStatus }));
-          }, 0);
-        }
-
-        setAuthState(prev => ({
-          ...prev,
-          user,
-          session,
-          loading: false,
-          isAdmin: user ? prev.isAdmin : false
-        }));
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const user = session?.user ?? null;
-      let isAdmin = false;
-
-      if (user) {
-        isAdmin = await checkAdminRole(user.id);
-      }
+  const login = async (email, password, captchaToken?) => {
+    try {
+      const data = await api.login(email, password, captchaToken);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
 
       setAuthState({
-        user,
-        session,
+        user: data.user,
+        session: { access_token: data.token, user: data.user },
         loading: false,
-        isAdmin
+        isAdmin: data.user.role === 'admin'
       });
-    });
-
-    return () => subscription.unsubscribe();
-  }, [checkAdminRole]);
+      return { user: data.user, error: null };
+    } catch (err) {
+      return { user: null, error: err };
+    }
+  };
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setAuthState({
+      user: null,
+      session: null,
+      loading: false,
+      isAdmin: false
+    });
   }, []);
 
   return {
     ...authState,
+    login,
     signOut
   };
 };

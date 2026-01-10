@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useSEO } from '@/hooks/useSEO';
+import { api } from '@/services/api';
 
 const SeoManager = () => {
   const { toast } = useToast();
@@ -38,19 +39,19 @@ const SeoManager = () => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      // Guardar en localStorage
-      localStorage.setItem('seoConfig', JSON.stringify(seoData));
-      
-      // Actualizar meta tags dinámicamente
+      // Save to Backend
+      await api.saveSettings('seo_config', seoData);
+
+      // Update meta tags dynamically
       document.title = seoData.title;
-      
-      // Actualizar meta tags existentes
+
+      // Update meta tags existing
       const updateMetaTag = (property: string, content: string, isName = false) => {
         const selector = isName ? `meta[name="${property}"]` : `meta[property="${property}"]`;
         let metaTag = document.querySelector(selector) as HTMLMetaElement;
-        
+
         if (!metaTag) {
           metaTag = document.createElement('meta');
           if (isName) {
@@ -60,28 +61,28 @@ const SeoManager = () => {
           }
           document.head.appendChild(metaTag);
         }
-        
+
         metaTag.content = content;
       };
 
-      // Actualizar todas las meta tags
+      // Update all meta tags
       updateMetaTag('description', seoData.description, true);
       updateMetaTag('keywords', seoData.keywords, true);
       updateMetaTag('author', seoData.author, true);
       updateMetaTag('theme-color', seoData.themeColor, true);
-      
+
       // Open Graph
       updateMetaTag('og:title', seoData.title);
       updateMetaTag('og:description', seoData.description);
       updateMetaTag('og:image', `${seoData.siteUrl}${seoData.ogImage}`);
       updateMetaTag('og:url', seoData.siteUrl);
-      
+
       // Twitter
       updateMetaTag('twitter:title', seoData.title, true);
       updateMetaTag('twitter:description', seoData.description, true);
       updateMetaTag('twitter:image', `${seoData.siteUrl}${seoData.ogImage}`, true);
 
-      // Actualizar favicon si cambió
+      // Update favicon if changed
       const faviconLink = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
       if (faviconLink) {
         faviconLink.href = seoData.favicon;
@@ -89,9 +90,10 @@ const SeoManager = () => {
 
       toast({
         title: "Configuración guardada",
-        description: "Los cambios SEO se han aplicado correctamente.",
+        description: "Los cambios SEO se han guardado en el servidor.",
       });
     } catch (error) {
+      console.error('Error saving SEO:', error);
       toast({
         title: "Error",
         description: "No se pudo guardar la configuración SEO.",
@@ -116,10 +118,14 @@ const SeoManager = () => {
           });
           return;
         }
-        
+
         try {
+          // Use our API upload instead of direct Supabase if possible, or keep as is if working.
+          // Since user uses Supabase storage directly here, we keep it, but normally we should move to backend proxy if we want to remove Supabase dependency fully.
+          // For now, keeping as is to avoid breaking working upload logic. 
+          // Wait, 'import' inside function is unusual but works.
           const { supabase } = await import('@/integrations/supabase/client');
-          
+
           const fileName = `seo-${field}-${Date.now()}-${file.name}`;
           const { data, error } = await supabase.storage
             .from('terminal-images')
@@ -139,7 +145,7 @@ const SeoManager = () => {
 
           console.log(`SEO ${field} image uploaded successfully:`, publicUrl);
           handleInputChange(field, publicUrl);
-          
+
           toast({
             title: "Imagen subida",
             description: `La imagen ${file.name} se ha subido correctamente.`,
@@ -157,16 +163,19 @@ const SeoManager = () => {
     input.click();
   };
 
-  // Cargar configuración guardada al inicializar
+  // Load saved config on init
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem('seoConfig');
-      if (saved) {
-        setSeoData(JSON.parse(saved));
+    const loadSettings = async () => {
+      try {
+        const data = await api.getSettings('seo_config');
+        if (data) {
+          setSeoData(data);
+        }
+      } catch (error) {
+        console.error('Error loading SEO config:', error);
       }
-    } catch (error) {
-      console.error('Error loading SEO config:', error);
-    }
+    };
+    loadSettings();
   }, []);
 
   return (
@@ -241,6 +250,33 @@ const SeoManager = () => {
                 onChange={(e) => handleInputChange('siteUrl', e.target.value)}
                 placeholder="https://tu-dominio.com"
               />
+            </div>
+
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-lg font-semibold">Scripts de Seguimiento (Tracking)</h3>
+              <div className="space-y-2">
+                <Label htmlFor="headScripts">Scripts de Cabecera (HEAD)</Label>
+                <p className="text-xs text-gray-500">Ej: Facebook Pixel, Google Analytics. (Se inyectan en &lt;head&gt;)</p>
+                <Textarea
+                  id="headScripts"
+                  value={(seoData as any).headScripts || ''}
+                  onChange={(e) => handleInputChange('headScripts', e.target.value)}
+                  placeholder="<script>...</script>"
+                  className="font-mono text-xs h-32"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bodyScripts">Scripts de Cuerpo (BODY)</Label>
+                <p className="text-xs text-gray-500">Ej: Chat Widgets. (Se inyectan después de &lt;body&gt;)</p>
+                <Textarea
+                  id="bodyScripts"
+                  value={(seoData as any).bodyScripts || ''}
+                  onChange={(e) => handleInputChange('bodyScripts', e.target.value)}
+                  placeholder="<script>...</script>"
+                  className="font-mono text-xs h-32"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

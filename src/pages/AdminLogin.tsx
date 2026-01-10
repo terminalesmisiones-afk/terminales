@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
+
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,37 +19,45 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, login } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (!loading) {
-      if (user && isAdmin) {
-        navigate('/admin/dashboard');
-      } else if (user && !isAdmin) {
-        setError('Acceso denegado. Se requieren privilegios de administrador.');
+      if (user) {
+        // Redirigir a todos los usuarios autenticados al panel admin
+        navigate('/admin');
       }
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, loading, navigate]);
+
+  const { executeRecaptcha } = useGoogleReCaptcha();
+
+  // ... (useEffect skip) ...
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      if (!executeRecaptcha) {
+        console.warn('Recaptcha not ready'); // Optional fallback
+      }
+
+      const token = executeRecaptcha ? await executeRecaptcha('login') : undefined;
+      console.log('RECAPTCHA Token generated:', token);
+
+      const { user, error } = await login(email, password, token);
 
       if (error) throw error;
+      if (!user) throw new Error('Usuario no encontrado');
 
       toast({
         title: "Inicio de sesión exitoso",
-        description: "Verificando privilegios de administrador...",
+        description: "Redirigiendo al panel...",
       });
-      
+
     } catch (error: any) {
       console.error('Error de login:', error);
       setError(error.message || 'Error al iniciar sesión');
@@ -87,7 +96,7 @@ const AdminLogin = () => {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -97,10 +106,11 @@ const AdminLogin = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="off"
                   className="h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña</Label>
                 <div className="relative">
@@ -111,6 +121,7 @@ const AdminLogin = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="new-password"
                     className="h-11 pr-10"
                   />
                   <Button
@@ -146,10 +157,10 @@ const AdminLogin = () => {
             </form>
 
             <div className="mt-4 text-center space-y-2">
-              <Link to="/auth" className="text-sm text-primary hover:underline block">
-                ¿Necesitas una cuenta? Regístrate
+              <Link to="/register" className="text-sm text-primary hover:underline block font-medium">
+                ¿Necesitas acceso? Solicita tu registro aquí
               </Link>
-              <Link to="/" className="text-sm text-primary hover:underline block">
+              <Link to="/" className="text-sm text-gray-500 hover:text-primary hover:underline block">
                 ← Volver al sitio web
               </Link>
             </div>

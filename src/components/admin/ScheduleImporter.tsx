@@ -28,30 +28,59 @@ const ScheduleImporter: React.FC<ScheduleImporterProps> = ({ onImport }) => {
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim());
-        
+        console.log('Contenido del archivo:', text.substring(0, 200) + '...');
+
+        const lines = text.split(/\r?\n/); // Handle Windows/Unix line endings
+        if (lines.length < 2) {
+          setError('El archivo parece estar vacío o solo tiene cabecera.');
+          setIsLoading(false);
+          return;
+        }
+
+        // Detect delimiter (comma or semicolon) using header
+        const header = lines[0];
+        const delimiter = header.includes(';') ? ';' : ',';
+        console.log(`Delimitador detectado: "${delimiter}"`);
+
         const schedules = lines.slice(1).map((line, index) => {
-          const values = line.split(',').map(v => v.trim());
+          if (!line.trim()) return null;
+
+          // Regex to split by delimiter respecting quotes
+          const regex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+          const values = line.split(regex).map(v => v.trim().replace(/^"|"$/g, ''));
+
+          // Expected format: Empresa, Destino, Turno, Lun-Vie, Sab, Dom, Plataforma
+          if (values.length < 2) return null;
+
           return {
             id: Date.now() + index,
             company: values[0] || '',
             destination: values[1] || '',
-            departure: values[2] || '',
-            arrival: values[3] || '',
-            frequency: values[4] || '',
-            platform: values[5] || ''
+            remarks: values[2] || '',
+            departure_mon_fri: values[3] || '',
+            departure_sat: values[4] || '',
+            departure_sun: values[5] || '',
+            platform: values[6] || ''
           };
-        }).filter(schedule => schedule.company && schedule.destination);
+        }).filter((schedule): schedule is any => schedule !== null && !!schedule.company && !!schedule.destination);
 
-        onImport(schedules);
+        if (schedules.length === 0) {
+          alert('Error: No se pudieron leer horarios del archivo. Verifica el formato.');
+          setError('No se encontraron horarios válidos. Revisa el delimitador y las columnas.');
+        } else {
+          alert(`¡Éxito! Se han leído ${schedules.length} horarios.`);
+          onImport(schedules);
+        }
         setIsLoading(false);
       } catch (err) {
+        console.error(err);
         setError('Error al procesar el archivo. Verifica el formato.');
         setIsLoading(false);
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'ISO-8859-1'); // Try Latin1 to handle accents if UTF-8 fails, though usually UTF-8 is better. Let's stick to auto/UTF8 default for readAsText but maybe BOM handles it.
+    // Actually, let's use default encoding (UTF-8 generally) but maybe needed for Excel CSVs.
+    // Let's standard readAsText(file) first.
   };
 
   const handleGoogleSheetsImport = async () => {
@@ -62,38 +91,62 @@ const ScheduleImporter: React.FC<ScheduleImporterProps> = ({ onImport }) => {
 
     try {
       // Convertir URL de Google Sheets a formato CSV
-      const csvUrl = googleSheetsUrl.replace('/edit#gid=', '/export?format=csv&gid=');
+      let csvUrl = googleSheetsUrl;
+      if (googleSheetsUrl.includes('docs.google.com/spreadsheets')) {
+        csvUrl = googleSheetsUrl.replace('/edit#gid=', '/export?format=csv&gid=');
+        if (!csvUrl.includes('/export?')) {
+          // Fallback for simple link
+          csvUrl = googleSheetsUrl.replace(/\/edit.*$/, '/export?format=csv');
+        }
+      }
+
+      console.log('Fetching CSV from:', csvUrl);
       const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error('Error de red al obtener Google Sheets');
       const text = await response.text();
-      
-      const lines = text.split('\n');
+
+      console.log('Contenido Google Sheets:', text.substring(0, 200));
+
+      const lines = text.split(/\r?\n/);
       const schedules = lines.slice(1).map((line, index) => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        if (!line.trim()) return null;
+        const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+
+        if (values.length < 2) return null;
+
         return {
           id: Date.now() + index,
           company: values[0] || '',
           destination: values[1] || '',
-          departure: values[2] || '',
-          arrival: values[3] || '',
-          frequency: values[4] || '',
-          platform: values[5] || ''
+          remarks: values[2] || '',
+          departure_mon_fri: values[3] || '',
+          departure_sat: values[4] || '',
+          departure_sun: values[5] || '',
+          platform: values[6] || ''
         };
-      }).filter(schedule => schedule.company && schedule.destination);
+      }).filter((schedule): schedule is any => schedule !== null && !!schedule.company && !!schedule.destination);
 
-      onImport(schedules);
+      if (schedules.length === 0) {
+        alert('No se encontraron horarios en el Google Sheet. Verifica que la hoja no esté vacía.');
+      } else {
+        alert(`¡Éxito! Importados ${schedules.length} horarios desde Google Sheets.`);
+        onImport(schedules);
+      }
       setIsLoading(false);
     } catch (err) {
-      setError('Error al importar desde Google Sheets. Verifica la URL y permisos.');
+      console.error(err);
+      setError('Error al importar desde Google Sheets. Verifica que el enlace sea PÚBLICO ("Cualquier persona con el enlace").');
       setIsLoading(false);
     }
   };
 
   const downloadTemplate = () => {
-    const csvContent = 'Empresa,Destino,Salida,Llegada,Frecuencia,Plataforma\n' +
-      'Ejemplo S.A.,Buenos Aires,08:00,20:00,Diario,Plataforma 1\n' +
-      'Transporte XYZ,Corrientes,10:30,14:00,Lunes a Viernes,Plataforma 2';
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent = 'Empresa,Destino,Turno,Lun-Vie,Sab,Dom,Plataforma\n' +
+      'Ejemplo S.A.,Buenos Aires,Mañana,08:00,08:00,09:00,5\n' +
+      'Transporte XYZ,Corrientes,Tarde,14:30,14:30,,3';
+
+    // Add BOM for Excel compatibility
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -121,7 +174,7 @@ const ScheduleImporter: React.FC<ScheduleImporterProps> = ({ onImport }) => {
         {/* Plantilla */}
         <div className="space-y-2">
           <Label>1. Descargar Plantilla</Label>
-          <Button 
+          <Button
             onClick={downloadTemplate}
             variant="outline"
             className="w-full"
@@ -154,7 +207,7 @@ const ScheduleImporter: React.FC<ScheduleImporterProps> = ({ onImport }) => {
               onChange={(e) => setGoogleSheetsUrl(e.target.value)}
               disabled={isLoading}
             />
-            <Button 
+            <Button
               onClick={handleGoogleSheetsImport}
               disabled={!googleSheetsUrl || isLoading}
             >
@@ -173,7 +226,7 @@ const ScheduleImporter: React.FC<ScheduleImporterProps> = ({ onImport }) => {
           <p className="text-sm text-blue-800">
             El archivo debe tener las siguientes columnas en orden:
             <br />
-            <strong>Empresa, Destino, Salida, Llegada, Frecuencia, Plataforma</strong>
+            <strong>Empresa, Destino, Turno, Lun-Vie, Sáb, Dom, Plataforma</strong>
           </p>
         </div>
       </CardContent>

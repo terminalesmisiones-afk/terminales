@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,8 @@ import TerminalModal from './TerminalModal';
 import { useSupabaseTerminals } from '@/hooks/useSupabaseTerminals';
 import { useSupabaseAdmin } from '@/hooks/useSupabaseAdmin';
 import { Terminal as ImportedTerminal } from '@/types/terminal';
+import { api } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface Schedule {
   id: number;
@@ -17,11 +19,11 @@ interface Schedule {
   departure: string;
   arrival: string;
   frequency: string;
-  platform: string;  
+  platform: string;
 }
 
 interface Terminal {
-  id: number;
+  id: string;
   name: string;
   city: string;
   address: string;
@@ -37,6 +39,7 @@ interface Terminal {
   companyCount: number;
   lastUpdated: string;
   schedules?: Schedule[];
+  google_sheet_url?: string;
 }
 
 const TerminalsManager = () => {
@@ -44,6 +47,8 @@ const TerminalsManager = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState<any>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Use Supabase hooks
   const { terminals, loading, error, refreshTerminals } = useSupabaseTerminals();
@@ -51,7 +56,7 @@ const TerminalsManager = () => {
 
   // Transform Supabase terminals to local format
   const localTerminals = terminals.map(terminal => ({
-    id: parseInt(terminal.id.replace(/-/g, '').slice(0, 8), 16), // Convert UUID to number for compatibility
+    id: terminal.id,
     name: terminal.name,
     city: terminal.city,
     address: terminal.address,
@@ -61,27 +66,28 @@ const TerminalsManager = () => {
     longitude: terminal.longitude || 0,
     isActive: terminal.isActive,
     schedulesVisible: terminal.schedulesVisible,
-    description: '',
-    municipalityInfo: '',
+    description: terminal.description || '',
+    municipalityInfo: terminal.municipalityInfo || '',
     image: terminal.image,
     companyCount: terminal.companyCount,
     lastUpdated: terminal.lastUpdated.split('T')[0],
-    schedules: terminal.schedules || []
+    schedules: terminal.schedules || [],
+    google_sheet_url: terminal.google_sheet_url
   }));
 
   const filteredTerminals = localTerminals.filter(terminal => {
-    const matchesSearch = 
+    const matchesSearch =
       terminal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       terminal.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
       terminal.address.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = 
+
+    const matchesFilter =
       selectedFilter === 'all' ||
       (selectedFilter === 'active' && terminal.isActive) ||
       (selectedFilter === 'inactive' && !terminal.isActive) ||
       (selectedFilter === 'visible' && terminal.schedulesVisible) ||
       (selectedFilter === 'hidden' && !terminal.schedulesVisible);
-    
+
     return matchesSearch && matchesFilter;
   });
 
@@ -97,10 +103,22 @@ const TerminalsManager = () => {
 
   const handleSave = async (terminalData: any) => {
     try {
+      console.log('Guardando terminal (Payload):', terminalData);
+
+
+
+      // Transform for API (camelCase -> snake_case)
+      const apiPayload = {
+        ...terminalData,
+        municipality_info: terminalData.municipalityInfo,
+        schedules_visible: terminalData.schedulesVisible,
+        is_active: terminalData.isActive
+      };
+
       if (editingTerminal) {
-        await updateTerminal(editingTerminal.id, terminalData);
+        await updateTerminal(editingTerminal.id, apiPayload);
       } else {
-        await createTerminal(terminalData);
+        await createTerminal(apiPayload);
       }
       refreshTerminals();
       setShowModal(false);
@@ -117,6 +135,36 @@ const TerminalsManager = () => {
       } catch (error) {
         console.error('Error deleting terminal:', error);
       }
+    }
+  };
+
+  const handleSync = async (terminal: any) => {
+    if (!terminal.google_sheet_url) {
+      toast({
+        title: "Sin configuración",
+        description: "Esta terminal no tiene una URL de Google Sheets configurada.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSyncingId(terminal.id);
+    try {
+      const result = await api.syncTerminalById(terminal.id);
+      toast({
+        title: "Sincronización exitosa",
+        description: `Se han actualizado ${result.count || ''} horarios correctamente.`,
+      });
+      refreshTerminals();
+    } catch (error) {
+      console.error('Error syncing terminal:', error);
+      toast({
+        title: "Error de sincronización",
+        description: error instanceof Error ? error.message : "No se pudo sincronizar la terminal.",
+        variant: "destructive"
+      });
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -189,6 +237,9 @@ const TerminalsManager = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Integración Google Sheets - Reemplazado por sincronización por terminal */}
+      {/* <GoogleSheetsSync onSyncSuccess={refreshTerminals} /> */}
 
       {/* Filtros */}
       <Card>
@@ -294,6 +345,16 @@ const TerminalsManager = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleSync(terminal)}
+                          disabled={!terminal.google_sheet_url || syncingId === terminal.id}
+                          className={`h-8 w-8 p-0 ${!terminal.google_sheet_url ? 'text-gray-300' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'} ${syncingId === terminal.id ? 'animate-spin' : ''}`}
+                          title={terminal.google_sheet_url ? "Sincronizar con Google Sheets" : "Configura una URL de Google Sheets para sincronizar"}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleEdit(terminal)}
                           className="h-8 w-8 p-0"
                         >
@@ -302,7 +363,7 @@ const TerminalsManager = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(terminals.find(t => parseInt(t.id.replace(/-/g, '').slice(0, 8), 16) === terminal.id)?.id || '')}
+                          onClick={() => handleDelete(terminal.id)}
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />

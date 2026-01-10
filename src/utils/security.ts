@@ -32,6 +32,7 @@ export const validateFile = (file: File, options: {
   const extension = file.name.split('.').pop()?.toLowerCase();
   const validExtensions: Record<string, string[]> = {
     'image/jpeg': ['jpg', 'jpeg'],
+    'image/gif': ['gif'],
     'image/png': ['png'],
     'image/webp': ['webp']
   };
@@ -104,14 +105,14 @@ export const createRateLimiter = (maxRequests: number, windowMs: number) => {
   return (identifier: string): boolean => {
     const now = Date.now();
     const userRequests = requests.get(identifier) || [];
-    
+
     // Remove old requests outside the window
     const validRequests = userRequests.filter(time => now - time < windowMs);
-    
+
     if (validRequests.length >= maxRequests) {
       return false; // Rate limit exceeded
     }
-    
+
     validRequests.push(now);
     requests.set(identifier, validRequests);
     return true; // Request allowed

@@ -1,12 +1,13 @@
 
 export interface Schedule {
-  id: number;
+  id: string | number;
   company: string;
   destination: string;
-  departure: string;
-  arrival: string;
-  frequency: string;
-  platform: string;
+  remarks: string; // Turno
+  departure_mon_fri: string;
+  departure_sat: string;
+  departure_sun: string;
+  platform?: string;
 }
 
 export interface Terminal {
@@ -23,9 +24,13 @@ export interface Terminal {
   latitude?: number;
   longitude?: number;
   schedules?: Schedule[];
+  google_sheet_url?: string;
+  description?: string;
+  municipalityInfo?: string;
 }
 
 export interface TerminalsGridProps {
   searchQuery?: string;
   selectedCity?: string;
+  adSlotPrefix?: string;
 }

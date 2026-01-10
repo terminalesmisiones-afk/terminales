@@ -1,103 +1,121 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useBanners } from '@/hooks/useBanners';
 
-interface AdBannerSlotProps {
-  position: number;
-  type: 'desktop' | 'mobile' | 'tablet';
-  showOnMobile?: boolean;
-  showOnTablet?: boolean;  
-  showOnDesktop?: boolean;
+// Custom hook for media queries
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    const listener = () => setMatches(media.matches);
+    window.addEventListener('resize', listener); // Fallback listener
+    media.addEventListener('change', listener);
+    return () => {
+      window.removeEventListener('resize', listener);
+      media.removeEventListener('change', listener);
+    };
+  }, [matches, query]);
+
+  return matches;
 }
 
-const AdBannerSlot: React.FC<AdBannerSlotProps> = ({ 
-  position, 
+interface AdBannerSlotProps {
+  slot: string;
+  type?: 'desktop' | 'mobile' | 'tablet';
+  showOnMobile?: boolean;
+  showOnTablet?: boolean;
+  showOnDesktop?: boolean;
+  className?: string;
+}
+
+const AdBannerSlot: React.FC<AdBannerSlotProps> = ({
+  slot,
   type,
   showOnMobile = true,
   showOnTablet = true,
-  showOnDesktop = true 
+  showOnDesktop = true,
+  className = ''
 }) => {
-  // En producción, estos banners vendrían de la API/base de datos
-  // filtrados por posición, tipo de dispositivo y estado activo
-  const banners = [
-    {
-      id: 1,
-      title: 'Restaurante El Buen Sabor',
-      image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&h=300&fit=crop',
-      link: '#',
-      description: 'La mejor comida casera a pasos de la terminal'
-    },
-    {
-      id: 2,
-      title: 'Hotel Terminal Plaza',
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&h=300&fit=crop',
-      link: '#',
-      description: 'Hospedaje cómodo y accesible para viajeros'
-    },
-    {
-      id: 3,
-      title: 'Farmacia 24hs',
-      image: 'https://images.unsplash.com/photo-1576671081837-49000212a370?w=800&h=300&fit=crop',
-      link: '#',
-      description: 'Medicamentos y primeros auxilios las 24 horas'
-    }
-  ];
+  // Fetch ALL banners
+  const { banners: fetchedBanners } = useBanners();
 
-  const banner = banners[position % banners.length];
+  // Media queries
+  const isMobile = useMediaQuery('(max-width: 640px)');
+  const isTablet = useMediaQuery('(min-width: 641px) and (max-width: 1024px)');
+  const isDesktop = useMediaQuery('(min-width: 1025px)');
 
-  // Verificar si el banner debe mostrarse en este dispositivo
+  // Find the Specific Banner for this Slot
+  const banner = fetchedBanners.find(b => b.position === slot && b.isActive);
+
+  // Checking visibility conditions
   const shouldShow = () => {
-    if (type === 'mobile' && !showOnMobile) return false;
-    if (type === 'tablet' && !showOnTablet) return false;
-    if (type === 'desktop' && !showOnDesktop) return false;
+    if (!banner) return false;
+
+    // Legacy mode (strict type passed)
+    if (type) {
+      if (type === 'mobile' && !showOnMobile) return false;
+      if (type === 'tablet' && !showOnTablet) return false;
+      if (type === 'desktop' && !showOnDesktop) return false;
+      return true;
+    }
+
+    // Smart mode (check current device against banner config)
+    if (isMobile && !banner.showOnMobile) return false;
+    if (isTablet && !banner.showOnTablet) return false;
+    if (isDesktop && !banner.showOnDesktop) return false;
+
     return true;
   };
 
-  if (!shouldShow()) return null;
+  if (!shouldShow() || !banner) return null;
 
-  // Clases CSS responsivas basadas en el tipo y configuración
+  // Clases CSS responsivas
   const getResponsiveClasses = () => {
-    let classes = 'overflow-hidden hover:shadow-lg transition-shadow cursor-pointer';
-    
-    if (type === 'mobile') {
-      classes += ' block sm:hidden h-32 w-full max-w-sm mx-auto';
-    } else if (type === 'tablet') {
-      classes += ' hidden sm:block lg:hidden h-28 w-full max-w-4xl mx-auto';
-    } else { // desktop
-      classes += ' hidden lg:block h-32 xl:h-40 w-full max-w-6xl mx-auto';
+    let classes = `overflow-hidden hover:shadow-lg transition-shadow cursor-pointer mb-4 ${className}`;
+
+    if (type) {
+      if (type === 'mobile') {
+        classes += ' block sm:hidden h-auto w-full max-w-sm mx-auto';
+      } else if (type === 'tablet') {
+        classes += ' hidden sm:block lg:hidden h-auto w-full max-w-4xl mx-auto';
+      } else { // desktop
+        classes += ' hidden lg:block h-auto w-full max-w-6xl mx-auto';
+      }
+    } else {
+      // Universal sizing defaults
+      classes += ' h-auto w-full mx-auto max-w-6xl';
     }
-    
+
     return classes;
   };
 
   return (
     <Card className={getResponsiveClasses()}>
       <CardContent className="p-0 h-full">
-        <div className="relative h-full group">
-          <img
-            src={banner.image}
-            alt={banner.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
-            <div className="p-2 sm:p-4 text-white">
-              <h3 className="font-bold text-sm sm:text-base lg:text-lg mb-1">{banner.title}</h3>
-              <p className="text-xs sm:text-sm lg:text-base text-white/90 hidden sm:block">
-                {banner.description}
-              </p>
-            </div>
-          </div>
-          <div className="absolute top-1 right-1 sm:top-2 sm:right-2">
-            <span className="bg-black/20 text-white text-xs px-1 sm:px-2 py-0.5 sm:py-1 rounded">
-              Publicidad
-            </span>
-          </div>
-          {/* Dimensiones recomendadas como comentario informativo */}
-          <div className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="bg-black/40 text-white text-xs px-1 py-0.5 rounded">
-              {type === 'mobile' ? 'Móvil: 400x250px' : type === 'tablet' ? 'Tablet: 800x200px' : 'Desktop: 1200x300px'}
-            </span>
-          </div>
+        <div className="relative h-full group flex justify-center items-center bg-gray-50">
+          {banner.uploadType === 'html' ? (
+            <div
+              className="w-full h-full"
+              dangerouslySetInnerHTML={{ __html: banner.htmlCode || '' }}
+            />
+          ) : (
+            <a
+              href={banner.linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full h-full relative"
+            >
+              <img
+                src={`${banner.imageUrl}?t=${new Date().getTime()}`}
+                alt={banner.title}
+                className="w-full h-auto max-h-[300px] object-contain group-hover:scale-105 transition-transform duration-300"
+              />
+            </a>
+          )}
         </div>
       </CardContent>
     </Card>

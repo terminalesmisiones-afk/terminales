@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useSupabaseNotifications } from '@/hooks/useSupabaseNotifications';
+import { useNotificationStore } from '@/store/useNotificationStore';
 
 const SupabaseNotificationCenter = () => {
   const {
@@ -14,7 +14,7 @@ const SupabaseNotificationCenter = () => {
     markAsRead,
     deleteNotification,
     clearAllNotifications
-  } = useSupabaseNotifications();
+  } = useNotificationStore();
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -69,7 +69,7 @@ const SupabaseNotificationCenter = () => {
             </Badge>
           )}
         </div>
-        
+
         {notifications.length > 0 && (
           <Button
             onClick={clearAllNotifications}
@@ -148,11 +148,10 @@ const SupabaseNotificationCenter = () => {
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 rounded-lg border transition-all duration-200 ${
-                      !notification.isRead 
-                        ? getNotificationColor(notification.type)
-                        : 'bg-gray-50 border-gray-200'
-                    } ${!notification.isRead ? 'border-l-4' : ''}`}
+                    className={`p-4 rounded-lg border transition-all duration-200 ${!notification.isRead
+                      ? getNotificationColor(notification.type)
+                      : 'bg-gray-50 border-gray-200'
+                      } ${!notification.isRead ? 'border-l-4' : ''}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-3 flex-1">
@@ -176,7 +175,7 @@ const SupabaseNotificationCenter = () => {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-1 ml-4">
                         {!notification.isRead && (
                           <Button

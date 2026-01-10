@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Menu, Bell, User, LogOut, Settings, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
 import SupabaseNotificationModal from './SupabaseNotificationModal';
-import { useSupabaseNotifications } from '@/hooks/useSupabaseNotifications';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,11 +25,10 @@ interface AdminHeaderProps {
 const AdminHeader = ({ onMenuClick }: AdminHeaderProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
-  const { notifications } = useSupabaseNotifications();
+  const { notifications, unreadCount } = useNotificationStore();
   const { signOut } = useAuth();
   const { toast } = useToast();
-  
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
@@ -37,6 +37,8 @@ const AdminHeader = ({ onMenuClick }: AdminHeaderProps) => {
         title: "Sesión cerrada",
         description: "Has cerrado sesión correctamente",
       });
+      // Redirect to login page
+      navigate('/admin/login');
     } catch (error) {
       toast({
         title: "Error",
@@ -128,11 +130,11 @@ const AdminHeader = ({ onMenuClick }: AdminHeaderProps) => {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/admin/profile')}>
                   <User className="mr-2 h-4 w-4" />
                   Perfil
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Configuración
                 </DropdownMenuItem>

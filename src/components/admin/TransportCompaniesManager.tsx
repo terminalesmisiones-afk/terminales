@@ -11,9 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeInput, sanitizeHTML, isValidEmail, isValidPhone, isValidURL, validateFile } from '@/utils/security';
+import { api } from '@/services/api';
 
 interface TransportCompany {
-  id: number;
+  id: string | number;
   name: string;
   logo: string;
   phone: string;
@@ -33,6 +34,9 @@ const TransportCompaniesManager = () => {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [editingCompany, setEditingCompany] = useState<TransportCompany | null>(null);
+  const [companies, setCompanies] = useState<TransportCompany[]>([]);
+  const [loading, setLoading] = useState(false);
+
   const [formData, setFormData] = useState<Omit<TransportCompany, 'id' | 'lastUpdated'>>({
     name: '',
     logo: '',
@@ -45,10 +49,8 @@ const TransportCompaniesManager = () => {
     ticketOffices: '',
     isActive: true
   });
-  
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // Detect mobile screen
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -56,78 +58,47 @@ const TransportCompaniesManager = () => {
       setIsMobile(window.innerWidth < 768);
       setViewMode(window.innerWidth < 768 ? 'cards' : 'table');
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const loadCompanies = (): TransportCompany[] => {
+  const fetchCompanies = async () => {
+    setLoading(true);
     try {
-      const stored = localStorage.getItem('transportCompanies');
-      if (stored) {
-        return JSON.parse(stored);
-      }
+      const data = await api.getAdminCompanies();
+      // Map backend snake_case to frontend camelCase
+      const mappedData = data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        logo: item.logo || '',
+        phone: item.phone || '',
+        whatsapp: item.whatsapp || '',
+        email: item.email || '',
+        address: item.address || '',
+        website: item.website || '',
+        description: item.description || '',
+        ticketOffices: item.ticket_offices || '', // mapping from DB column
+        isActive: Boolean(item.is_active),
+        lastUpdated: item.last_updated || item.updated_at || new Date().toISOString().split('T')[0]
+      }));
+      setCompanies(mappedData);
     } catch (error) {
-      console.error('Error loading companies:', error);
+      console.error('Error fetching companies:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las empresas.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-
-    // Empresas por defecto
-    const defaultCompanies: TransportCompany[] = [
-      {
-        id: 1,
-        name: 'Empresa Crucero del Norte',
-        logo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=200&h=100&fit=crop',
-        phone: '+54 376 442-7788',
-        whatsapp: '+54 9 376 442-7788',
-        email: 'info@crucero-norte.com.ar',
-        address: 'Av. Quaranta 2580, Posadas, Misiones',
-        website: 'https://crucero-norte.com.ar',
-        description: 'Empresa líder en transporte de pasajeros en el nordeste argentino',
-        ticketOffices: 'Terminal Posadas, Terminal Oberá, Terminal Puerto Iguazú',
-        isActive: true,
-        lastUpdated: new Date().toISOString().split('T')[0]
-      },
-      {
-        id: 2,
-        name: 'Singer',
-        logo: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=200&h=100&fit=crop',
-        phone: '+54 376 443-5566',
-        whatsapp: '+54 9 376 443-5566',
-        email: 'contacto@singer.com.ar',
-        address: 'Av. Sarmiento 1234, Posadas, Misiones',
-        website: 'https://singer.com.ar',
-        description: 'Empresa de transporte con amplia cobertura nacional',
-        ticketOffices: 'Terminal Posadas, Terminal Oberá',
-        isActive: true,
-        lastUpdated: new Date().toISOString().split('T')[0]
-      },
-      {
-        id: 3,
-        name: 'Via Bariloche',
-        logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=200&h=100&fit=crop',
-        phone: '+54 376 444-9988',
-        whatsapp: '+54 9 376 444-9988',
-        email: 'info@viabariloche.com.ar',
-        address: 'Ruta Nacional 12, Posadas, Misiones',
-        website: 'https://viabariloche.com.ar',
-        description: 'Especializada en viajes de larga distancia hacia la Patagonia',
-        ticketOffices: 'Terminal Posadas',
-        isActive: true,
-        lastUpdated: new Date().toISOString().split('T')[0]
-      }
-    ];
-
-    localStorage.setItem('transportCompanies', JSON.stringify(defaultCompanies));
-    return defaultCompanies;
   };
 
-  const [companies, setCompanies] = useState<TransportCompany[]>(loadCompanies());
-
-  const saveCompanies = (newCompanies: TransportCompany[]) => {
-    setCompanies(newCompanies);
-    localStorage.setItem('transportCompanies', JSON.stringify(newCompanies));
-  };
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
 
   const filteredCompanies = companies.filter(company =>
     company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,13 +127,13 @@ const TransportCompaniesManager = () => {
     setFormData({
       name: company.name,
       logo: company.logo,
-      phone: company.phone,
-      whatsapp: company.whatsapp,
-      email: company.email,
-      address: company.address,
-      website: company.website,
-      description: company.description,
-      ticketOffices: company.ticketOffices,
+      phone: company.phone || '',
+      whatsapp: company.whatsapp || '',
+      email: company.email || '',
+      address: company.address || '',
+      website: company.website || '',
+      description: company.description || '',
+      ticketOffices: company.ticketOffices || '',
       isActive: company.isActive
     });
     setShowModal(true);
@@ -170,49 +141,22 @@ const TransportCompaniesManager = () => {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-
-    // Validate name
-    if (!formData.name.trim()) {
-      errors.name = 'El nombre de la empresa es requerido';
-    } else if (formData.name.trim().length < 2) {
-      errors.name = 'El nombre debe tener al menos 2 caracteres';
-    }
-
-    // Validate email
-    if (formData.email && !isValidEmail(formData.email)) {
-      errors.email = 'El formato del email no es válido';
-    }
-
-    // Validate phone
-    if (formData.phone && !isValidPhone(formData.phone)) {
-      errors.phone = 'El formato del teléfono no es válido';
-    }
-
-    // Validate WhatsApp
-    if (formData.whatsapp && !isValidPhone(formData.whatsapp)) {
-      errors.whatsapp = 'El formato del WhatsApp no es válido';
-    }
-
-    // Validate website
-    if (formData.website && !isValidURL(formData.website)) {
-      errors.website = 'El formato de la URL no es válido';
-    }
-
+    if (!formData.name.trim()) errors.name = 'El nombre de la empresa es requerido';
+    else if (formData.name.trim().length < 2) errors.name = 'El nombre debe tener al menos 2 caracteres';
+    if (formData.email && !isValidEmail(formData.email)) errors.email = 'El formato del email no es válido';
+    if (formData.phone && !isValidPhone(formData.phone)) errors.phone = 'El formato del teléfono no es válido';
+    if (formData.whatsapp && !isValidPhone(formData.whatsapp)) errors.whatsapp = 'El formato del WhatsApp no es válido';
+    if (formData.website && !isValidURL(formData.website)) errors.website = 'El formato de la URL no es válido';
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validateForm()) {
-      toast({
-        title: "Error de validación",
-        description: "Por favor, corrige los errores en el formulario.",
-        variant: "destructive"
-      });
+      toast({ title: "Error de validación", description: "Por favor, corrige los errores.", variant: "destructive" });
       return;
     }
 
-    // Sanitize all text inputs
     const sanitizedData = {
       ...formData,
       name: sanitizeInput(formData.name.trim()),
@@ -225,36 +169,39 @@ const TransportCompaniesManager = () => {
       ticketOffices: sanitizeInput(formData.ticketOffices.trim())
     };
 
-    if (editingCompany) {
-      const updatedCompanies = companies.map(c =>
-        c.id === editingCompany.id ? {
+    try {
+      if (editingCompany) {
+        await api.updateCompany(editingCompany.id, {
           ...sanitizedData,
-          id: editingCompany.id,
-          lastUpdated: new Date().toISOString().split('T')[0]
-        } : c
-      );
-      saveCompanies(updatedCompanies);
-    } else {
-      const newCompany: TransportCompany = {
-        ...sanitizedData,
-        id: Date.now(),
-        lastUpdated: new Date().toISOString().split('T')[0]
-      };
-      saveCompanies([...companies, newCompany]);
+          isActive: formData.isActive
+        });
+        toast({ title: "Empresa actualizada", description: "Los cambios se han guardado correctamente." });
+      } else {
+        await api.createCompany({
+          ...sanitizedData,
+          isActive: formData.isActive
+        });
+        toast({ title: "Empresa creada", description: "La nueva empresa se ha creado correctamente." });
+      }
+      setShowModal(false);
+      setValidationErrors({});
+      fetchCompanies(); // Refresh list
+    } catch (error) {
+      console.error('Error saving company:', error);
+      toast({ title: "Error", description: "No se pudo guardar la empresa.", variant: "destructive" });
     }
-
-    setShowModal(false);
-    setValidationErrors({});
-    toast({
-      title: "Empresa guardada",
-      description: "La empresa se ha guardado correctamente.",
-    });
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number | string) => {
     if (confirm('¿Estás seguro de que quieres eliminar esta empresa?')) {
-      const updatedCompanies = companies.filter(c => c.id !== id);
-      saveCompanies(updatedCompanies);
+      try {
+        await api.deleteCompany(id);
+        toast({ title: "Empresa eliminada", description: "La empresa ha sido eliminada." });
+        fetchCompanies();
+      } catch (error) {
+        console.error('Error deleting company:', error);
+        toast({ title: "Error", description: "No se pudo eliminar la empresa.", variant: "destructive" });
+      }
     }
   };
 
@@ -262,48 +209,39 @@ const TransportCompaniesManager = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        // Validate file
-        const validation = validateFile(file, {
-          maxSize: 2 * 1024 * 1024, // 2MB
-          allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
-        });
-
+        const validation = validateFile(file, { maxSize: 2 * 1024 * 1024, allowedTypes: ['image/jpeg', 'image/png', 'image/webp'] });
         if (!validation.valid) {
-          toast({
-            title: "Error en el archivo",
-            description: validation.error,
-            variant: "destructive"
-          });
+          toast({ title: "Error en el archivo", description: validation.error, variant: "destructive" });
           return;
         }
 
-        const mockUrl = `/lovable-uploads/${file.name}`;
-        setFormData(prev => ({ ...prev, logo: mockUrl }));
-        toast({
-          title: "Logo subido",
-          description: `El logo ${file.name} se ha subido correctamente.`,
-        });
+        try {
+          // Use real API upload
+          const response = await api.uploadFile(file);
+          setFormData(prev => ({ ...prev, logo: response.url }));
+          toast({ title: "Logo subido", description: `El logo ${file.name} se ha subido correctamente.` });
+        } catch (error) {
+          console.error('Upload error:', error);
+          toast({ title: "Error de subida", description: "No se pudo subir la imagen.", variant: "destructive" });
+        }
       }
     };
     input.click();
   };
 
-  // Mobile Card Component
   const CompanyCard = ({ company }: { company: TransportCompany }) => (
     <Card className="mb-4 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3 flex-1">
             <img
-              src={company.logo}
+              src={company.logo || '/placeholder.svg'}
               alt={company.name}
               className="w-12 h-8 object-contain rounded"
-              onError={(e) => {
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100&h=60&fit=crop';
-              }}
+              onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100&h=60&fit=crop'; }}
             />
             <div className="flex-1 min-w-0">
               <h3 className="font-medium text-gray-900 truncate">{company.name}</h3>
@@ -315,20 +253,10 @@ const TransportCompaniesManager = () => {
             </div>
           </div>
           <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleEdit(company)}
-              className="h-8 px-3"
-            >
+            <Button variant="outline" size="sm" onClick={() => handleEdit(company)} className="h-8 px-3">
               <Edit className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDelete(company.id)}
-              className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
+            <Button variant="outline" size="sm" onClick={() => handleDelete(company.id)} className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50">
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -350,7 +278,6 @@ const TransportCompaniesManager = () => {
         </Button>
       </div>
 
-      {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -376,7 +303,6 @@ const TransportCompaniesManager = () => {
         </Card>
       </div>
 
-      {/* Filtros */}
       <Card>
         <CardContent className="p-4">
           <div className="relative">
@@ -391,7 +317,6 @@ const TransportCompaniesManager = () => {
         </CardContent>
       </Card>
 
-      {/* Mobile Cards or Desktop Table */}
       {isMobile ? (
         <div className="space-y-4">
           <div className="text-sm text-gray-600 mb-4">
@@ -425,12 +350,10 @@ const TransportCompaniesManager = () => {
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <img
-                            src={company.logo}
+                            src={company.logo || '/placeholder.svg'}
                             alt={company.name}
                             className="w-12 h-8 object-contain rounded"
-                            onError={(e) => {
-                              e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100&h=60&fit=crop';
-                            }}
+                            onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100&h=60&fit=crop'; }}
                           />
                           <div>
                             <div className="font-medium">{company.name}</div>
@@ -464,20 +387,10 @@ const TransportCompaniesManager = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(company)}
-                            className="h-8 w-8 p-0"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(company)} className="h-8 w-8 p-0">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(company.id)}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(company.id)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -491,7 +404,6 @@ const TransportCompaniesManager = () => {
         </Card>
       )}
 
-      {/* Modal de Edición - Optimizado para móvil */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className={`${isMobile ? 'max-w-[95vw] h-[90vh] overflow-y-auto' : 'max-w-2xl max-h-[90vh] overflow-y-auto'}`}>
           <DialogHeader>
@@ -520,9 +432,7 @@ const TransportCompaniesManager = () => {
                   required
                   className={`mt-1 ${validationErrors.name ? 'border-red-500' : ''}`}
                 />
-                {validationErrors.name && (
-                  <p className="text-sm text-red-600 mt-1">{validationErrors.name}</p>
-                )}
+                {validationErrors.name && <p className="text-sm text-red-600 mt-1">{validationErrors.name}</p>}
               </div>
 
               <div>
@@ -534,12 +444,7 @@ const TransportCompaniesManager = () => {
                     placeholder="URL del logo"
                     className="flex-1"
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleLogoUpload}
-                    size="sm"
-                  >
+                  <Button type="button" variant="outline" onClick={handleLogoUpload} size="sm">
                     <Upload className="h-4 w-4" />
                   </Button>
                 </div>
@@ -548,9 +453,7 @@ const TransportCompaniesManager = () => {
                     src={formData.logo}
                     alt="Vista previa"
                     className="w-32 h-20 object-contain mt-2 rounded border"
-                    onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=200&h=100&fit=crop';
-                    }}
+                    onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=200&h=100&fit=crop'; }}
                   />
                 )}
               </div>
@@ -564,9 +467,7 @@ const TransportCompaniesManager = () => {
                   placeholder="Ej: +54 376 442-7788"
                   className={`mt-1 ${validationErrors.phone ? 'border-red-500' : ''}`}
                 />
-                {validationErrors.phone && (
-                  <p className="text-sm text-red-600 mt-1">{validationErrors.phone}</p>
-                )}
+                {validationErrors.phone && <p className="text-sm text-red-600 mt-1">{validationErrors.phone}</p>}
               </div>
 
               <div>
@@ -578,9 +479,7 @@ const TransportCompaniesManager = () => {
                   placeholder="Ej: +54 9 376 442-7788"
                   className={`mt-1 ${validationErrors.whatsapp ? 'border-red-500' : ''}`}
                 />
-                {validationErrors.whatsapp && (
-                  <p className="text-sm text-red-600 mt-1">{validationErrors.whatsapp}</p>
-                )}
+                {validationErrors.whatsapp && <p className="text-sm text-red-600 mt-1">{validationErrors.whatsapp}</p>}
               </div>
 
               <div>
@@ -593,9 +492,7 @@ const TransportCompaniesManager = () => {
                   placeholder="Ej: info@empresa.com"
                   className={`mt-1 ${validationErrors.email ? 'border-red-500' : ''}`}
                 />
-                {validationErrors.email && (
-                  <p className="text-sm text-red-600 mt-1">{validationErrors.email}</p>
-                )}
+                {validationErrors.email && <p className="text-sm text-red-600 mt-1">{validationErrors.email}</p>}
               </div>
             </div>
 
@@ -620,9 +517,7 @@ const TransportCompaniesManager = () => {
                   placeholder="https://empresa.com"
                   className={`mt-1 ${validationErrors.website ? 'border-red-500' : ''}`}
                 />
-                {validationErrors.website && (
-                  <p className="text-sm text-red-600 mt-1">{validationErrors.website}</p>
-                )}
+                {validationErrors.website && <p className="text-sm text-red-600 mt-1">{validationErrors.website}</p>}
               </div>
 
               <div>

@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { sanitizeInput, validateFile } from '@/utils/security';
 
 interface Terminal {
-  id?: number;
+  id?: string | number;
   name: string;
   city: string;
   address: string;
@@ -22,6 +22,7 @@ interface Terminal {
   description: string;
   municipalityInfo: string;
   image: string;
+  longContent?: string;
 }
 
 interface TerminalBasicInfoFormProps {
@@ -60,29 +61,12 @@ const TerminalBasicInfoForm: React.FC<TerminalBasicInfoFormProps> = ({
         }
 
         try {
-          // Importar el hook de Supabase para upload real
-          const { supabase } = await import('@/integrations/supabase/client');
-          
-          const fileName = `terminal-${Date.now()}-${file.name}`;
-          const { data, error } = await supabase.storage
-            .from('terminal-images')
-            .upload(fileName, file, {
-              cacheControl: '3600',
-              upsert: false
-            });
+          const { api } = await import('@/services/api');
+          const data = await api.uploadFile(file);
 
-          if (error) {
-            console.error('Supabase storage error:', error);
-            throw error;
-          }
+          console.log('Image uploaded successfully:', data.url);
+          onFieldChange('image', data.url);
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('terminal-images')
-            .getPublicUrl(data.path);
-
-          console.log('Image uploaded successfully:', publicUrl);
-          onFieldChange('image', publicUrl);
-          
           toast({
             title: "Imagen subida",
             description: `La imagen ${file.name} se ha subido correctamente.`,
@@ -107,8 +91,8 @@ const TerminalBasicInfoForm: React.FC<TerminalBasicInfoFormProps> = ({
           <Label htmlFor="name">Nombre de la Terminal</Label>
           <Input
             id="name"
-              value={formData.name}
-              onChange={(e) => onFieldChange('name', sanitizeInput(e.target.value))}
+            value={formData.name}
+            onChange={(e) => onFieldChange('name', sanitizeInput(e.target.value))}
             placeholder="Ej: Terminal de Posadas"
             required
           />
@@ -118,8 +102,8 @@ const TerminalBasicInfoForm: React.FC<TerminalBasicInfoFormProps> = ({
           <Label htmlFor="city">Ciudad</Label>
           <Input
             id="city"
-              value={formData.city}
-              onChange={(e) => onFieldChange('city', sanitizeInput(e.target.value))}
+            value={formData.city}
+            onChange={(e) => onFieldChange('city', sanitizeInput(e.target.value))}
             placeholder="Ej: Posadas"
             required
           />

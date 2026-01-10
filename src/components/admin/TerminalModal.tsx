@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { notifyTerminalsUpdated } from '@/hooks/useTerminals';
 import TerminalBasicInfoForm from './TerminalBasicInfoForm';
@@ -10,17 +11,18 @@ import TerminalSchedulesForm from './TerminalSchedulesForm';
 import TerminalSettingsForm from './TerminalSettingsForm';
 
 interface Schedule {
-  id: number;
+  id: string | number;
   company: string;
   destination: string;
-  departure: string;
-  arrival: string;
-  frequency: string;
-  platform: string;
+  remarks: string;
+  departure_mon_fri: string;
+  departure_sat: string;
+  departure_sun: string;
+  platform?: string;
 }
 
 interface Terminal {
-  id?: number;
+  id?: string | number;
   name: string;
   city: string;
   address: string;
@@ -34,6 +36,7 @@ interface Terminal {
   municipalityInfo: string;
   image: string;
   schedules?: Schedule[];
+  google_sheet_url?: string;
 }
 
 interface TerminalModalProps {
@@ -57,14 +60,18 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, terminal
     description: '',
     municipalityInfo: '',
     image: '',
-    schedules: []
+    schedules: [],
+    google_sheet_url: ''
   });
 
   useEffect(() => {
     if (terminal) {
       setFormData({
         ...terminal,
-        schedules: terminal.schedules || []
+        latitude: terminal.latitude || -27.367,
+        longitude: terminal.longitude || -55.896,
+        schedules: terminal.schedules || [],
+        google_sheet_url: terminal.google_sheet_url || ''
       });
     } else {
       setFormData({
@@ -80,7 +87,8 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, terminal
         description: '',
         municipalityInfo: '',
         image: '',
-        schedules: []
+        schedules: [],
+        google_sheet_url: ''
       });
     }
   }, [terminal, isOpen]);
@@ -88,16 +96,16 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, terminal
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     console.log('Guardando terminal con datos:', formData);
-    
+
     onSave(formData);
-    
+
     // Disparar evento personalizado para notificar cambios
     setTimeout(() => {
       notifyTerminalsUpdated();
     }, 100);
-    
+
     onClose();
   };
 
@@ -125,20 +133,20 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, terminal
   const geocodeAddress = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!formData.address) return;
-    
+
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.address + ', Misiones, Argentina')}&limit=1`);
       const data = await response.json();
-      
+
       if (data && data.length > 0) {
         const result = data[0];
         const newLat = parseFloat(result.lat);
         const newLng = parseFloat(result.lon);
-        
+
         console.log('Geocodificación exitosa:', { newLat, newLng });
-        
+
         setFormData(prev => ({
           ...prev,
           latitude: newLat,
@@ -153,15 +161,16 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, terminal
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
+          // console.log("Backdrop click ignored for debugging"); // Debug code removed
         }
       }}
     >
-      <div 
+      <div
         className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -175,48 +184,54 @@ const TerminalModal: React.FC<TerminalModalProps> = ({ isOpen, onClose, terminal
         </div>
 
         <div className="p-6" onClick={(e) => e.stopPropagation()}>
-          <Tabs defaultValue="general" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="general">Información General</TabsTrigger>
-              <TabsTrigger value="location">Ubicación</TabsTrigger>
-              <TabsTrigger value="schedules">Horarios</TabsTrigger>
-              <TabsTrigger value="settings">Configuración</TabsTrigger>
-            </TabsList>
+          <ErrorBoundary>
+            <Tabs defaultValue="general" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="general">Información General</TabsTrigger>
+                <TabsTrigger value="location">Ubicación</TabsTrigger>
+                <TabsTrigger value="schedules">Horarios</TabsTrigger>
+                <TabsTrigger value="settings">Configuración</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="general" className="space-y-6">
-              <TerminalBasicInfoForm
-                formData={formData}
-                onFieldChange={handleFieldChange}
-                onGeocodeAddress={geocodeAddress}
-              />
-            </TabsContent>
+              <TabsContent value="general" className="space-y-6">
+                <TerminalBasicInfoForm
+                  formData={formData}
+                  onFieldChange={handleFieldChange}
+                  onGeocodeAddress={geocodeAddress}
+                />
+              </TabsContent>
 
-            <TabsContent value="location" className="space-y-6">
-              <TerminalLocationForm
-                latitude={formData.latitude}
-                longitude={formData.longitude}
-                onLocationChange={handleLocationChange}
-              />
-            </TabsContent>
+              <TabsContent value="location" className="space-y-6">
+                <TerminalLocationForm
+                  latitude={formData.latitude}
+                  longitude={formData.longitude}
+                  onLocationChange={handleLocationChange}
+                  city={formData.city}
+                  address={formData.address}
+                />
+              </TabsContent>
 
-            <TabsContent value="schedules" className="space-y-6">
-              <TerminalSchedulesForm
-                terminalId={formData.id}
-                terminalName={formData.name}
-                schedules={formData.schedules || []}
-                onSchedulesChange={handleSchedulesChange}
-              />
-            </TabsContent>
+              <TabsContent value="schedules" className="space-y-6">
+                <TerminalSchedulesForm
+                  terminalId={formData.id}
+                  terminalName={formData.name}
+                  schedules={formData.schedules || []}
+                  onSchedulesChange={handleSchedulesChange}
+                />
+              </TabsContent>
 
-            <TabsContent value="settings" className="space-y-6">
-              <TerminalSettingsForm
-                isActive={formData.isActive}
-                schedulesVisible={formData.schedulesVisible}
-                onActiveChange={(checked) => handleFieldChange('isActive', checked)}
-                onSchedulesVisibleChange={(checked) => handleFieldChange('schedulesVisible', checked)}
-              />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="settings" className="space-y-6">
+                <TerminalSettingsForm
+                  isActive={formData.isActive}
+                  schedulesVisible={formData.schedulesVisible}
+                  googleSheetUrl={formData.google_sheet_url || ''}
+                  onActiveChange={(checked) => handleFieldChange('isActive', checked)}
+                  onSchedulesVisibleChange={(checked) => handleFieldChange('schedulesVisible', checked)}
+                  onGoogleSheetUrlChange={(value) => handleFieldChange('google_sheet_url', value)}
+                />
+              </TabsContent>
+            </Tabs>
+          </ErrorBoundary>
 
           <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-end gap-4 pt-6 border-t mt-6">

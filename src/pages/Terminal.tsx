@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { api } from '@/services/api';
 import { MapPin, Clock, Info, ArrowLeft } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -23,6 +25,7 @@ interface TerminalData {
   image: string;
   description: string;
   municipalityInfo: string;
+  longContent?: string;
   latitude: number;
   longitude: number;
   isActive: boolean;
@@ -33,13 +36,14 @@ interface TerminalData {
 }
 
 interface Schedule {
-  id: number;
+  id: string | number;
   company: string;
   destination: string;
-  departure: string;
-  arrival: string;
-  frequency: string;
-  platform: string;
+  remarks: string;
+  departure_mon_fri: string;
+  departure_sat: string;
+  departure_sun: string;
+  platform?: string;
 }
 
 const Terminal = () => {
@@ -60,88 +64,76 @@ const Terminal = () => {
     url: window.location.href
   });
 
-  // Función para cargar terminales desde localStorage
-  const loadTerminalFromStorage = () => {
-    try {
-      const storedTerminals = localStorage.getItem('terminals');
-      if (storedTerminals) {
-        const terminals = JSON.parse(storedTerminals);
-        console.log('Terminales cargadas desde localStorage:', terminals);
-        
-        // Buscar terminal por ID (convertir a string para compatibilidad)
-        const terminalId = id?.toString();
-        const foundTerminal = terminals.find((t: any) => t.id.toString() === terminalId);
-        
-        if (foundTerminal) {
-          console.log('Terminal encontrada:', foundTerminal);
-          
-          // Convertir el formato del admin al formato esperado por la página
-          const terminalData: TerminalData = {
-            id: foundTerminal.id.toString(),
-            name: foundTerminal.name,
-            city: foundTerminal.city,
-            address: foundTerminal.address,
-            phone: foundTerminal.phone || '',
-            email: foundTerminal.email || '',
-            image: foundTerminal.image || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=300&fit=crop',
-            description: foundTerminal.description || `Terminal de ómnibus de ${foundTerminal.city}`,
-            municipalityInfo: foundTerminal.municipalityInfo || `Información sobre ${foundTerminal.city}`,
-            latitude: foundTerminal.latitude,
-            longitude: foundTerminal.longitude,
-            isActive: foundTerminal.isActive,
-            schedulesVisible: foundTerminal.schedulesVisible,
-            lastUpdated: foundTerminal.lastUpdated,
-            companyCount: foundTerminal.companyCount,
-            schedules: foundTerminal.schedules || []
-          };
-          
-          setTerminal(terminalData);
-          setSchedules(terminalData.schedules);
-          console.log('Horarios cargados:', terminalData.schedules);
-        } else {
-          console.log('Terminal no encontrada con ID:', terminalId);
-          setTerminal(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error cargando terminal desde localStorage:', error);
-      setTerminal(null);
-    }
-  };
+  // Import api
+  // (Assuming import is added at top, if not I will add it in a sec)
 
   useEffect(() => {
-    console.log('Cargando terminal con ID:', id);
-    loadTerminalFromStorage();
-    setLoading(false);
+    const fetchTerminal = async () => {
+      if (!id) return;
 
-    // Escuchar cambios en localStorage para actualizaciones en tiempo real
-    const handleStorageChange = () => {
-      console.log('Detectado cambio en localStorage, recargando terminal...');
-      loadTerminalFromStorage();
+      try {
+        setLoading(true);
+        const data = await api.getTerminalById(id);
+
+        // Transform data from API (snake_case) to Component (camelCase)
+        const terminalData: TerminalData = {
+          id: data.id,
+          name: data.name,
+          city: data.city,
+          address: data.address,
+          phone: data.phone || '',
+          email: data.email || '',
+          image: data.image || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=400&h=300&fit=crop',
+          description: data.description || `Terminal de ómnibus de ${data.city}`,
+          municipalityInfo: data.municipality_info || `Información sobre ${data.city}`,
+          longContent: data.long_content,
+          latitude: Number(data.latitude) || 0,
+          longitude: Number(data.longitude) || 0,
+          isActive: Boolean(data.is_active),
+          schedulesVisible: Boolean(data.schedules_visible),
+          lastUpdated: data.updated_at || new Date().toISOString(),
+          companyCount: 0, // Calculate from schedules
+          schedules: []
+        };
+
+        const schedules = data.schedules?.map((s: any) => ({
+          id: s.id,
+          company: s.company,
+          destination: s.destination,
+          remarks: s.remarks,
+          departure_mon_fri: s.departure_mon_fri,
+          departure_sat: s.departure_sat,
+          departure_sun: s.departure_sun,
+          platform: s.platform
+        })) || [];
+
+        // Count unique companies
+        const uniqueCompanies = new Set(schedules.map((s: any) => s.company)).size;
+        terminalData.companyCount = uniqueCompanies;
+        terminalData.schedules = schedules;
+
+        setTerminal(terminalData);
+        setSchedules(schedules);
+      } catch (error) {
+        console.error('Error loading terminal:', error);
+        setTerminal(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    
-    // También verificar cambios cada 2 segundos para actualizaciones desde el admin
-    const interval = setInterval(() => {
-      loadTerminalFromStorage();
-    }, 2000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    fetchTerminal();
   }, [id]);
 
   const companies = ['all', ...new Set(schedules.map(schedule => schedule.company))];
 
   const filteredSchedules = schedules.filter(schedule => {
-    const matchesSearch = 
+    const matchesSearch =
       schedule.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.destination.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesCompany = selectedCompany === 'all' || schedule.company === selectedCompany;
-    
+
     return matchesSearch && matchesCompany;
   });
 
@@ -163,7 +155,7 @@ const Terminal = () => {
   };
 
   const shareSchedule = (schedule: Schedule, platform: 'whatsapp' | 'facebook' | 'telegram') => {
-    const text = `🚌 ${schedule.company}\n📍 ${schedule.destination}\n🕐 Salida: ${schedule.departure}\n🕑 Llegada: ${schedule.arrival}\n📅 ${schedule.frequency}`;
+    const text = `🚌 ${schedule.company}\n📍 ${schedule.destination}\n🕐 Lun-Vie: ${schedule.departure_mon_fri || '-'}\n🕐 Sab: ${schedule.departure_sat || '-'}\n🕐 Dom: ${schedule.departure_sun || '-'}`;
     const url = window.location.href;
 
     switch (platform) {
@@ -180,13 +172,13 @@ const Terminal = () => {
   };
 
   const shareScheduleToWhatsApp = (schedule: Schedule) => {
-    // Simplified message format - only destination and departure time
-    const horarioText = `🚌 *${schedule.company}*\n📍 ${schedule.destination}\n🕐 ${schedule.departure}`;
+    // Simplified message format
+    const horarioText = `🚌 *${schedule.company}*\n📍 ${schedule.destination}\n🕐 L-V: ${schedule.departure_mon_fri || '-'}\n🕐 S: ${schedule.departure_sat || '-'}\n🕐 D: ${schedule.departure_sun || '-'}`;
     const guiaText = `\n\n${sharingConfig.customMessage || sharingConfig.defaultShareText}`;
     const url = `\n\n🔗 ${window.location.href}`;
-    
+
     const fullMessage = `${horarioText}${guiaText}${url}`;
-    
+
     window.open(`https://wa.me/?text=${encodeURIComponent(fullMessage)}`, '_blank');
   };
 
@@ -203,16 +195,20 @@ const Terminal = () => {
 
   if (!terminal) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Terminal no encontrada</h2>
-          <p className="text-gray-600 mb-4">La terminal que buscas no existe o ha sido eliminada.</p>
-          <Link to="/" className="text-primary hover:text-primary-600 font-medium">
-            <ArrowLeft className="h-4 w-4 inline mr-2" />
-            Volver al inicio
-          </Link>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Terminal no encontrada</h2>
+            <p className="text-gray-600 mb-4">La terminal que buscas no existe o ha sido eliminada.</p>
+            <Link to="/" className="text-primary hover:text-primary-600 font-medium">
+              <ArrowLeft className="h-4 w-4 inline mr-2" />
+              Volver al inicio
+            </Link>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -220,11 +216,11 @@ const Terminal = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
-      
+
       <main className="flex-1 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Botón Volver */}
         <div className="mb-6">
-          <Link 
+          <Link
             to="/"
             className="inline-flex items-center text-primary hover:text-primary-600 font-medium"
           >
@@ -236,10 +232,9 @@ const Terminal = () => {
         {/* Header de la Terminal */}
         <TerminalHeader terminal={terminal} />
 
-        {/* Banner de Publicidad - Header */}
-        <div className="mb-6 space-y-4">
-          <AdBannerSlot position={0} type="desktop" />
-          <AdBannerSlot position={0} type="mobile" />
+        {/* Banner de Publicidad - Header (Terminal Top) */}
+        <div className="mb-6">
+          <AdBannerSlot slot="terminal-top" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -290,34 +285,55 @@ const Terminal = () => {
               onShareToTelegram={shareToTelegram}
             />
 
-            {/* INFORMACIÓN DEL MUNICIPIO */}
-            {terminal.municipalityInfo && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Info className="h-5 w-5 mr-2" />
-                    Sobre {terminal.city}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-700 leading-relaxed">
-                    {terminal.municipalityInfo}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {/* Banner de Publicidad - Middle (Entre botones e info) */}
+            <div className="my-6">
+              <AdBannerSlot slot="terminal-middle" />
+            </div>
+
+            {/* DESCRIPCIÓN DE LA TERMINAL - ACCORDION */}
+            <div className="space-y-4">
+              {terminal.description && (
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="description" className="border rounded-lg bg-white px-4 shadow-sm">
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex items-center text-lg font-semibold text-gray-900">
+                        <Info className="h-5 w-5 mr-2" />
+                        Sobre la Terminal
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-gray-700 leading-relaxed pb-4">
+                      {terminal.description}
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
+
+              {/* INFORMACIÓN DEL MUNICIPIO - ACCORDION */}
+              {terminal.municipalityInfo && (
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="municipality" className="border rounded-lg bg-white px-4 shadow-sm">
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex items-center text-lg font-semibold text-gray-900">
+                        <Info className="h-5 w-5 mr-2" />
+                        Sobre {terminal.city}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-gray-700 leading-relaxed pb-4">
+                      {terminal.municipalityInfo}
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Banners Publicitarios - Sidebar */}
             <div className="space-y-4">
-              <AdBannerSlot position={3} type="desktop" />
-              <AdBannerSlot position={4} type="desktop" />
-              <AdBannerSlot position={5} type="desktop" />
-              <AdBannerSlot position={3} type="mobile" />
-              <AdBannerSlot position={4} type="mobile" />
-              <AdBannerSlot position={5} type="mobile" />
+              <AdBannerSlot slot="sidebar-1" />
+              <AdBannerSlot slot="sidebar-2" />
+              <AdBannerSlot slot="sidebar-3" />
             </div>
 
             {/* Mapa */}
@@ -334,16 +350,21 @@ const Terminal = () => {
                 />
               </CardContent>
             </Card>
+
+            {/* Banner de Publicidad - Sidebar Bottom (Bajo Mapa) */}
+            <div>
+              <AdBannerSlot slot="sidebar-map-bottom" />
+            </div>
           </div>
         </div>
 
         {/* Banner de Publicidad - Footer */}
-        <div className="mt-8 space-y-4">
-          <AdBannerSlot position={2} type="desktop" />
-          <AdBannerSlot position={2} type="mobile" />
+        {/* Banner de Publicidad - Footer */}
+        <div className="mt-8">
+          <AdBannerSlot slot="content-bottom" />
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

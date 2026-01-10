@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Eye, EyeOff, Image, Info, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,10 @@ import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeInput, sanitizeHTML, validateFile } from '@/utils/security';
+import { api } from '@/services/api';
 
 interface Banner {
-  id: number;
+  id: string | number;
   title: string;
   imageUrl: string;
   linkUrl: string;
@@ -36,27 +37,10 @@ interface Banner {
 
 const BannerManager = () => {
   const { toast } = useToast();
-  const [banners, setBanners] = useState<Banner[]>([
-    {
-      id: 1,
-      title: 'Publicidad Restaurant Central',
-      imageUrl: '/placeholder.svg',
-      linkUrl: 'https://restaurantcentral.com',
-      uploadType: 'url' as const,
-      position: 'header',
-      terminal: 'Posadas',
-      deviceType: 'desktop',
-      showOnMobile: true,
-      showOnTablet: true,
-      showOnDesktop: true,
-      isActive: true,
-      startDate: '2024-06-01',
-      endDate: '2024-07-01',
-      clicks: 156,
-      impressions: 2340
-    }
-  ]);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [loading, setLoading] = useState(false);
 
+  // Form State
   const [showForm, setShowForm] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const [formData, setFormData] = useState({
@@ -77,10 +61,77 @@ const BannerManager = () => {
   });
 
   const positions = [
-    { value: 'header', label: 'Header' },
-    { value: 'sidebar', label: 'Sidebar' },
-    { value: 'footer', label: 'Footer' },
-    { value: 'content', label: 'Entre Contenido' }
+    { value: 'header', label: 'Header (Todo el sitio)' },
+    { value: 'footer', label: 'Footer (Todo el sitio)' },
+    { value: 'home-middle', label: 'Inicio (Bajo Buscador)' },
+    { value: 'terminal-top', label: 'Terminal (Bajo Título)' },
+    { value: 'terminal-middle', label: 'Terminal (Bajo Horarios/Compartir)' },
+    { value: 'sidebar-map-bottom', label: 'Sidebar (Bajo Mapa)' },
+    { value: 'terminals-page-companies', label: 'Página Terminales - Empresas' },
+    { value: 'terminals-page-private', label: 'Página Terminales - Particulares' },
+
+    // --- GRANULAR GRID SLOTS (Inicio) ---
+    // Pos 1
+    { value: 'home-grid-pos-1-card', label: 'Inicio - Posición 1 (Tarjeta)' },
+    { value: 'home-grid-pos-1-wide', label: 'Inicio - Posición 1 (Ancho Completo)' },
+    // Pos 2
+    { value: 'home-grid-pos-2-card', label: 'Inicio - Posición 2 (Tarjeta)' },
+    { value: 'home-grid-pos-2-wide', label: 'Inicio - Posición 2 (Ancho Completo)' },
+    // Pos 3
+    { value: 'home-grid-pos-3-card', label: 'Inicio - Posición 3 (Tarjeta)' },
+    { value: 'home-grid-pos-3-wide', label: 'Inicio - Posición 3 (Ancho Completo)' },
+    // Pos 4
+    { value: 'home-grid-pos-4-card', label: 'Inicio - Posición 4 (Tarjeta)' },
+    { value: 'home-grid-pos-4-wide', label: 'Inicio - Posición 4 (Ancho Completo)' },
+    // Pos 5
+    { value: 'home-grid-pos-5-card', label: 'Inicio - Posición 5 (Tarjeta)' },
+    { value: 'home-grid-pos-5-wide', label: 'Inicio - Posición 5 (Ancho Completo)' },
+    // Pos 6
+    { value: 'home-grid-pos-6-card', label: 'Inicio - Posición 6 (Tarjeta)' },
+    { value: 'home-grid-pos-6-wide', label: 'Inicio - Posición 6 (Ancho Completo)' },
+    // Pos 7
+    { value: 'home-grid-pos-7-card', label: 'Inicio - Posición 7 (Tarjeta)' },
+    { value: 'home-grid-pos-7-wide', label: 'Inicio - Posición 7 (Ancho Completo)' },
+    // Pos 8
+    { value: 'home-grid-pos-8-card', label: 'Inicio - Posición 8 (Tarjeta)' },
+    { value: 'home-grid-pos-8-wide', label: 'Inicio - Posición 8 (Ancho Completo)' },
+    // Pos 9
+    { value: 'home-grid-pos-9-card', label: 'Inicio - Posición 9 (Tarjeta)' },
+    { value: 'home-grid-pos-9-wide', label: 'Inicio - Posición 9 (Ancho Completo)' },
+
+    // --- GRANULAR GRID SLOTS (Pág. Terminales) ---
+    // Pos 1
+    { value: 'terminals-page-grid-pos-1-card', label: 'Pág. Terminales - Posición 1 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-1-wide', label: 'Pág. Terminales - Posición 1 (Ancho Completo)' },
+    // Pos 2
+    { value: 'terminals-page-grid-pos-2-card', label: 'Pág. Terminales - Posición 2 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-2-wide', label: 'Pág. Terminales - Posición 2 (Ancho Completo)' },
+    // Pos 3
+    { value: 'terminals-page-grid-pos-3-card', label: 'Pág. Terminales - Posición 3 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-3-wide', label: 'Pág. Terminales - Posición 3 (Ancho Completo)' },
+    // Pos 4
+    { value: 'terminals-page-grid-pos-4-card', label: 'Pág. Terminales - Posición 4 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-4-wide', label: 'Pág. Terminales - Posición 4 (Ancho Completo)' },
+    // Pos 5
+    { value: 'terminals-page-grid-pos-5-card', label: 'Pág. Terminales - Posición 5 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-5-wide', label: 'Pág. Terminales - Posición 5 (Ancho Completo)' },
+    // Pos 6
+    { value: 'terminals-page-grid-pos-6-card', label: 'Pág. Terminales - Posición 6 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-6-wide', label: 'Pág. Terminales - Posición 6 (Ancho Completo)' },
+    // Pos 7
+    { value: 'terminals-page-grid-pos-7-card', label: 'Pág. Terminales - Posición 7 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-7-wide', label: 'Pág. Terminales - Posición 7 (Ancho Completo)' },
+    // Pos 8
+    { value: 'terminals-page-grid-pos-8-card', label: 'Pág. Terminales - Posición 8 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-8-wide', label: 'Pág. Terminales - Posición 8 (Ancho Completo)' },
+    // Pos 9
+    { value: 'terminals-page-grid-pos-9-card', label: 'Pág. Terminales - Posición 9 (Tarjeta)' },
+    { value: 'terminals-page-grid-pos-9-wide', label: 'Pág. Terminales - Posición 9 (Ancho Completo)' },
+
+    { value: 'sidebar-2', label: 'Sidebar 2 (Medio)' },
+    { value: 'sidebar-3', label: 'Sidebar 3 (Inferior)' },
+    { value: 'content-top', label: 'Contenido (Arriba)' },
+    { value: 'content-bottom', label: 'Contenido (Abajo)' }
   ];
 
   const terminals = [
@@ -97,25 +148,90 @@ const BannerManager = () => {
     { value: 'mobile', label: 'Móvil', dimensions: '400x250px' }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const newBanner: Banner = {
-      id: editingBanner ? editingBanner.id : Date.now(),
-      ...formData,
-      uploadType: formData.uploadType as 'url' | 'file' | 'html',
-      clicks: editingBanner ? editingBanner.clicks : 0,
-      impressions: editingBanner ? editingBanner.impressions : 0
-    };
+  const fetchBanners = async () => {
+    setLoading(true);
+    console.log('[BannerManager] Fetching banners...');
+    try {
+      // Test Ping
+      try {
+        const ping = await fetch('http://localhost:3005/api/ping');
+        console.log('[BannerManager] Ping result:', ping.status, await ping.json());
+      } catch (e) {
+        console.error('[BannerManager] Ping failed:', e);
+      }
 
-    if (editingBanner) {
-      setBanners(prev => prev.map(b => b.id === editingBanner.id ? newBanner : b));
-    } else {
-      setBanners(prev => [...prev, newBanner]);
+      const data = await api.getAdminBanners();
+      console.log('[BannerManager] Raw data received:', data);
+
+      // Map DB snake_case to frontend camelCase
+      const mappedData = data.map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        imageUrl: item.image_url || '',
+        linkUrl: item.link_url || '',
+        htmlCode: item.html_code || '',
+        uploadType: item.upload_type || 'url',
+        position: item.position || 'header',
+        terminal: item.terminal_id || 'all',
+        deviceType: item.device_type || 'all',
+        showOnMobile: Boolean(item.show_on_mobile),
+        showOnTablet: Boolean(item.show_on_tablet),
+        showOnDesktop: Boolean(item.show_on_desktop),
+        isActive: Boolean(item.is_active),
+        startDate: item.start_date || '',
+        endDate: item.end_date || '',
+        clicks: item.clicks || 0,
+        impressions: item.impressions || 0
+      }));
+      console.log('[BannerManager] Mapped banners:', mappedData);
+      setBanners(mappedData);
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+      toast({ title: "Error", description: "No se pudieron cargar los banners.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBanners();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validations
+    if (!formData.title.trim()) {
+      toast({ title: "Error", description: "El título es requerido", variant: "destructive" });
+      return;
     }
 
-    setShowForm(false);
-    setEditingBanner(null);
+    const payload = {
+      ...formData,
+      uploadType: formData.uploadType as 'url' | 'file' | 'html',
+    };
+
+    try {
+      if (editingBanner) {
+        await api.updateBanner(editingBanner.id, payload);
+        toast({ title: "Banner actualizado", description: "Los cambios se han guardado." });
+      } else {
+        await api.createBanner(payload);
+        toast({ title: "Banner creado", description: "El nuevo banner está listo." });
+      }
+
+      setShowForm(false);
+      setEditingBanner(null);
+      resetForm();
+      fetchBanners();
+
+    } catch (error) {
+      console.error('Error saving banner:', error);
+      toast({ title: "Error", description: "Fallo al guardar el banner.", variant: "destructive" });
+    }
+  };
+
+  const resetForm = () => {
     setFormData({
       title: '',
       imageUrl: '',
@@ -155,38 +271,77 @@ const BannerManager = () => {
     setShowForm(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number | string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este banner?')) {
-      setBanners(prev => prev.filter(b => b.id !== id));
+      try {
+        await api.deleteBanner(id);
+        toast({ title: "Eliminado", description: "Banner eliminado correctamente." });
+        fetchBanners();
+      } catch (error) {
+        console.error('Delete error:', error);
+        toast({ title: "Error", description: "No se pudo eliminar.", variant: "destructive" });
+      }
     }
   };
 
-  const toggleActive = (id: number) => {
-    setBanners(prev => prev.map(b => 
-      b.id === id ? { ...b, isActive: !b.isActive } : b
-    ));
+  const toggleActive = async (banner: Banner) => {
+    try {
+      await api.updateBanner(banner.id, { ...banner, isActive: !banner.isActive });
+      fetchBanners(); // Refresh to see update
+      toast({ title: "Estado actualizado", description: `Banner ${!banner.isActive ? 'activado' : 'desactivado'}.` });
+    } catch (error) {
+      console.error('Toggle error:', error);
+    }
   };
 
   const selectedDeviceType = deviceTypes.find(dt => dt.value === formData.deviceType);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validation = validateFile(file, {
+        maxSize: 5 * 1024 * 1024,
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      });
+
+      if (!validation.valid) {
+        toast({ title: "Error", description: validation.error, variant: "destructive" });
+        return;
+      }
+
+      try {
+        // Use API uploadFile 
+        const response = await api.uploadFile(file);
+        setFormData(prev => ({ ...prev, imageUrl: response.url }));
+        toast({ title: "Imagen subida", description: "Archivo cargado correctamente." });
+      } catch (error: any) {
+        console.error('Upload error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Error al subir imagen.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestión de Banners</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Gestión de Banners (v2.0)</h2>
           <p className="text-gray-600">Administra la publicidad en el sitio web</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary-600">
+        <Button onClick={() => { resetForm(); setEditingBanner(null); setShowForm(true); }} className="bg-primary hover:bg-primary-600">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Banner
         </Button>
       </div>
 
-      {/* Información sobre dimensiones recomendadas */}
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          <strong>Dimensiones recomendadas:</strong> Escritorio: 1200x300px, Tablet: 800x200px, Móvil: 400x250px (más alto para mejor visibilidad)
+          <strong>Dimensiones recomendadas:</strong> Escritorio: 1200x300px, Tablet: 800x200px, Móvil: 400x250px
         </AlertDescription>
       </Alert>
 
@@ -211,7 +366,7 @@ const BannerManager = () => {
                 </div>
                 <div>
                   <Label htmlFor="uploadType">Tipo de Banner</Label>
-                  <Select value={formData.uploadType} onValueChange={(value: 'url' | 'file' | 'html') => setFormData(prev => ({ ...prev, uploadType: value }))}>
+                  <Select value={formData.uploadType} onValueChange={(value) => setFormData(prev => ({ ...prev, uploadType: value }))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -222,7 +377,7 @@ const BannerManager = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 {formData.uploadType === 'url' && (
                   <div>
                     <Label htmlFor="imageUrl">URL de la Imagen</Label>
@@ -234,7 +389,7 @@ const BannerManager = () => {
                     />
                   </div>
                 )}
-                
+
                 {formData.uploadType === 'file' && (
                   <div>
                     <Label htmlFor="imageFile">Subir Archivo</Label>
@@ -242,79 +397,26 @@ const BannerManager = () => {
                       id="imageFile"
                       type="file"
                       accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          // Validate file before upload
-                          const validation = validateFile(file, {
-                            maxSize: 5 * 1024 * 1024, // 5MB
-                            allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
-                          });
-
-                          if (!validation.valid) {
-                            toast({
-                              title: "Error",
-                              description: validation.error,
-                              variant: "destructive",
-                            });
-                            return;
-                          }
-
-                          try {
-                            const { supabase } = await import('@/integrations/supabase/client');
-                            
-                            const fileName = `banner-${Date.now()}-${file.name}`;
-                            const { data, error } = await supabase.storage
-                              .from('terminal-images')
-                              .upload(fileName, file, {
-                                cacheControl: '3600',
-                                upsert: false
-                              });
-
-                            if (error) {
-                              console.error('Supabase storage error:', error);
-                              throw error;
-                            }
-
-                            const { data: { publicUrl } } = supabase.storage
-                              .from('terminal-images')
-                              .getPublicUrl(data.path);
-
-                            console.log('Banner image uploaded successfully:', publicUrl);
-                            setFormData(prev => ({ ...prev, imageUrl: publicUrl }));
-                            
-                            toast({
-                              title: "Imagen subida",
-                              description: "La imagen se ha subido correctamente",
-                            });
-                          } catch (error) {
-                            console.error('Error uploading file:', error);
-                            toast({
-                              title: "Error",
-                              description: "Error al subir el archivo",
-                              variant: "destructive",
-                            });
-                          }
-                        }
-                      }}
+                      onChange={handleImageUpload}
                       required={!formData.imageUrl}
                     />
-                    <p className="text-xs text-gray-500 mt-1">JPG, PNG, SVG hasta 5MB</p>
+                    {formData.imageUrl && (
+                      <p className="text-xs text-green-600 mt-1">Imagen cargada: {formData.imageUrl.split('/').pop()}</p>
+                    )}
                   </div>
                 )}
-                
+
                 {formData.uploadType === 'html' && (
                   <div className="md:col-span-2">
                     <Label htmlFor="htmlCode">Código HTML</Label>
                     <Textarea
                       id="htmlCode"
                       value={formData.htmlCode}
-                      onChange={(e) => setFormData(prev => ({ ...prev, htmlCode: sanitizeHTML(e.target.value) }))}
-                      placeholder="Pega aquí tu código HTML (ej. Google AdSense, scripts de terceros)"
+                      onChange={(e) => setFormData(prev => ({ ...prev, htmlCode: e.target.value }))}
+                      placeholder="<script>...</script>"
                       rows={4}
                       required
                     />
-                    <p className="text-xs text-gray-500 mt-1">Código HTML válido para embebidos</p>
                   </div>
                 )}
                 {formData.uploadType !== 'html' && (
@@ -372,15 +474,11 @@ const BannerManager = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedDeviceType && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Dimensión recomendada: {selectedDeviceType.dimensions}
-                    </p>
-                  )}
                 </div>
                 <div className="md:col-span-2">
                   <Label>Mostrar en Dispositivos</Label>
                   <div className="flex gap-4 mt-2">
+                    {/* Mobile Switch */}
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="showOnMobile"
@@ -389,6 +487,7 @@ const BannerManager = () => {
                       />
                       <Label htmlFor="showOnMobile">Móvil</Label>
                     </div>
+                    {/* Tablet Switch */}
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="showOnTablet"
@@ -397,6 +496,7 @@ const BannerManager = () => {
                       />
                       <Label htmlFor="showOnTablet">Tablet</Label>
                     </div>
+                    {/* Desktop Switch */}
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="showOnDesktop"
@@ -466,85 +566,94 @@ const BannerManager = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {banners.map((banner) => (
-                <TableRow key={banner.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      {banner.uploadType === 'html' ? (
-                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
-                          <FileText className="h-6 w-6 text-gray-500" />
-                        </div>
-                      ) : (
-                        <img 
-                          src={banner.imageUrl} 
-                          alt={banner.title}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      )}
-                      <div>
-                        <div className="font-medium">{banner.title}</div>
-                        <div className="text-sm text-gray-500">
-                          {banner.uploadType === 'html' ? 'Código HTML' : banner.linkUrl}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{banner.position}</Badge>
-                  </TableCell>
-                  <TableCell>{banner.terminal}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {banner.showOnMobile && <Badge variant="outline" className="text-xs">M</Badge>}
-                      {banner.showOnTablet && <Badge variant="outline" className="text-xs">T</Badge>}
-                      {banner.showOnDesktop && <Badge variant="outline" className="text-xs">D</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={banner.isActive ? "default" : "secondary"}>
-                      {banner.isActive ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{banner.startDate}</div>
-                      <div>{banner.endDate}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{banner.impressions} vistas</div>
-                      <div>{banner.clicks} clicks</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(banner)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleActive(banner.id)}
-                      >
-                        {banner.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(banner.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+              {banners.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    No hay banners creados
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                banners.map((banner) => (
+                  <TableRow key={banner.id}>
+                    <TableCell>
+                      <div className="flex items-center space-x-3">
+                        {banner.uploadType === 'html' ? (
+                          <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
+                            <FileText className="h-6 w-6 text-gray-500" />
+                          </div>
+                        ) : (
+                          <img
+                            src={banner.imageUrl || '/placeholder.svg'}
+                            alt={banner.title}
+                            className="w-12 h-12 object-cover rounded"
+                            onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=100&h=60&fit=crop'; }}
+                          />
+                        )}
+                        <div>
+                          <div className="font-medium">{banner.title}</div>
+                          <div className="text-sm text-gray-500 truncate max-w-[150px]">
+                            {banner.uploadType === 'html' ? 'Código HTML' : banner.linkUrl}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{banner.position}</Badge>
+                    </TableCell>
+                    <TableCell>{banner.terminal}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {banner.showOnMobile && <Badge variant="outline" className="text-xs">M</Badge>}
+                        {banner.showOnTablet && <Badge variant="outline" className="text-xs">T</Badge>}
+                        {banner.showOnDesktop && <Badge variant="outline" className="text-xs">D</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={banner.isActive ? "default" : "secondary"}>
+                        {banner.isActive ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{banner.startDate || '-'}</div>
+                        <div>{banner.endDate || '-'}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{banner.impressions} vistas</div>
+                        <div>{banner.clicks} clicks</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(banner)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleActive(banner)}
+                        >
+                          {banner.isActive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(banner.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

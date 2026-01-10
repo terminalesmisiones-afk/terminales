@@ -7,16 +7,20 @@ import AdBannerSlot from './AdBannerSlot';
 
 interface TerminalsListProps {
   terminals: Terminal[];
+  adSlotPrefix?: string;
 }
 
-const TerminalsList: React.FC<TerminalsListProps> = ({ terminals }) => {
+const TerminalsList: React.FC<TerminalsListProps> = ({ terminals, adSlotPrefix = 'home-grid' }) => {
   const navigate = useNavigate();
+
+  // ... (handlers remain same)
 
   const handleViewSchedules = (id: string) => {
     navigate(`/terminal/${id}`);
   };
 
   const handleShare = (id: string, platform: 'whatsapp' | 'facebook' | 'telegram') => {
+    // ... same logic ...
     const terminal = terminals.find(t => t.id === id);
     if (!terminal) return;
 
@@ -38,7 +42,7 @@ const TerminalsList: React.FC<TerminalsListProps> = ({ terminals }) => {
 
   const renderTerminalsWithAds = () => {
     const elements: JSX.Element[] = [];
-    
+
     terminals.forEach((terminal, index) => {
       elements.push(
         <TerminalCard
@@ -58,15 +62,19 @@ const TerminalsList: React.FC<TerminalsListProps> = ({ terminals }) => {
         />
       );
 
-      if ((index + 1) % 3 === 0 && index < terminals.length - 1) {
-        const bannerIndex = Math.floor(index / 3);
-        elements.push(
-          <div key={`ad-${index}`} className="col-span-full space-y-4">
-            <AdBannerSlot position={bannerIndex} type="desktop" />
-            <AdBannerSlot position={bannerIndex + 1} type="mobile" />
-          </div>
-        );
-      }
+      // Insert Granular Banners after EACH terminal
+      // Position is 1-based index (Post-Terminal 1 = Pos 1)
+      const pos = index + 1;
+
+      elements.push(
+        <React.Fragment key={`ad-granular-${pos}`}>
+          {/* 1. Card Layout Ad (Flows in grid) */}
+          <AdBannerSlot slot={`${adSlotPrefix}-pos-${pos}-card`} />
+
+          {/* 2. Full Width Ad (Breaks grid) */}
+          <AdBannerSlot slot={`${adSlotPrefix}-pos-${pos}-wide`} className="col-span-full" />
+        </React.Fragment>
+      );
     });
 
     return elements;

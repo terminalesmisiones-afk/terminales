@@ -7,12 +7,16 @@ interface TerminalLocationFormProps {
   latitude: number;
   longitude: number;
   onLocationChange: (lat: number, lng: number) => void;
+  city?: string;
+  address?: string;
 }
 
 const TerminalLocationForm: React.FC<TerminalLocationFormProps> = ({
   latitude,
   longitude,
-  onLocationChange
+  onLocationChange,
+  city,
+  address
 }) => {
   return (
     <Card>
@@ -24,6 +28,8 @@ const TerminalLocationForm: React.FC<TerminalLocationFormProps> = ({
           latitude={latitude}
           longitude={longitude}
           onLocationChange={onLocationChange}
+          city={city}
+          address={address}
         />
       </CardContent>
     </Card>
