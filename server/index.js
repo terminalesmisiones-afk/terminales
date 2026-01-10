@@ -125,6 +125,33 @@ app.get('/api/ping', (req, res) => {
     res.json({ message: 'pong', timestamp: new Date().toISOString() });
 });
 
+// DEBUG: Route Lister
+app.get('/api/debug/routes', (req, res) => {
+    const routes = [];
+    app._router.stack.forEach((middleware) => {
+        if (middleware.route) { // routes registered directly on the app
+            routes.push({
+                path: middleware.route.path,
+                methods: Object.keys(middleware.route.methods)
+            });
+        } else if (middleware.name === 'router') { // router middleware 
+            middleware.handle.stack.forEach((handler) => {
+                if (handler.route) {
+                    routes.push({
+                        path: handler.route.path,
+                        methods: Object.keys(handler.route.methods)
+                    });
+                }
+            });
+        }
+    });
+    res.json({
+        routes,
+        env: process.env.NODE_ENV,
+        db_path: db.filename
+    });
+});
+
 // Public SEO Settings
 app.get('/api/seo', (req, res) => {
     db.get("SELECT value FROM app_settings WHERE key = 'seo'", [], (err, row) => {
