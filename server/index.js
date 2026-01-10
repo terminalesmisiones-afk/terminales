@@ -14,6 +14,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { parse } = require('csv-parse/sync');
 const crypto = require('crypto');
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
 // ... (Existing parseCSV helper - no changes to lines 15-52) ... (Wait, replace takes start/end, so I should be careful not to delete helper)
 
@@ -1806,6 +1807,53 @@ app.patch('/api/support/messages/mark-read', authenticateToken, async (req, res)
     }
 });
 
+
+
+// Payment Routes
+app.post('/api/payment/create-preference', async (req, res) => {
+    try {
+        const { title, price, quantity } = req.body;
+
+        // Get Access Token from DB
+        const settingsParams = await new Promise((resolve, reject) => {
+            db.get("SELECT value FROM app_settings WHERE key = 'mercadopago_access_token'", (err, row) => {
+                if (err) reject(err); else resolve(row);
+            });
+        });
+
+        if (!settingsParams || !settingsParams.value) {
+            console.error('MercadoPago Access Token missing in DB');
+            return res.status(500).json({ error: 'MercadoPago no configurado' });
+        }
+
+        const client = new MercadoPagoConfig({ accessToken: settingsParams.value });
+        const preference = new Preference(client);
+
+        const result = await preference.create({
+            body: {
+                items: [
+                    {
+                        title: title,
+                        unit_price: Number(price),
+                        quantity: Number(quantity),
+                        currency_id: 'ARS'
+                    }
+                ],
+                back_urls: {
+                    success: 'https://terminalesmisiones.com.ar/payment/success',
+                    failure: 'https://terminalesmisiones.com.ar/payment/failure',
+                    pending: 'https://terminalesmisiones.com.ar/payment/pending'
+                },
+                auto_return: 'approved'
+            }
+        });
+
+        res.json({ init_point: result.init_point });
+    } catch (error) {
+        console.error('Payment Error:', error);
+        res.status(500).json({ error: 'Error al crear preferencia de pago' });
+    }
+});
 
 
 // Admin: Dashboard Stats

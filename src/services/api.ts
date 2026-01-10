@@ -474,6 +474,16 @@ export const api = {
         return response.json();
     },
 
+    createPaymentPreference: async (data: { title: string, price: number, quantity: number }) => {
+        const response = await fetch(`${API_URL}/payment/create-preference`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Payment creation failed');
+        return response.json();
+    },
+
     uploadImage: async (file: File) => {
         const token = localStorage.getItem('token');
         const formData = new FormData();

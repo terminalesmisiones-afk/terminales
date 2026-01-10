@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { api } from '@/services/api';
 import { Check, Shield, TrendingUp, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -37,13 +38,12 @@ const Advertising = () => {
 
     const handleBuy = async (title: string, price: number) => {
         try {
-            // Use relative path to leverage Vite proxy
-            const res = await fetch('/api/payment/create-preference', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: `Publicidad: ${title}`, price: price, quantity: 1 })
+            const data = await api.createPaymentPreference({
+                title: `Publicidad: ${title}`,
+                price: price,
+                quantity: 1
             });
-            const data = await res.json();
+
             if (data.init_point) {
                 window.location.href = data.init_point;
             } else {
