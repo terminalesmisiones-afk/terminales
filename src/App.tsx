@@ -34,7 +34,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <GoogleReCaptchaProvider
-    reCaptchaKey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "INSERT_Site_Key_Here"}
+    reCaptchaKey="6Ld1oUUsAAAAAMb0IwXq5_sXFXnXnfPESfklDpFK"
     language="es"
     scriptProps={{
       async: false,

@@ -1,5 +1,5 @@
 // Usamos ruta relativa porque el Proxy de Vite (en dev) o Nginx (en prod) maneja la redirección
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = 'https://api-terminales.onrender.com/api';
 
 console.log('API Service initialized with URL:', API_URL);
 
