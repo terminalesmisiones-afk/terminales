@@ -1809,6 +1809,44 @@ app.patch('/api/support/messages/mark-read', authenticateToken, async (req, res)
 
 
 
+
+// Manual DB Fix Endpoint
+app.post('/api/debug/fix-db', authenticateToken, (req, res) => {
+    console.log('Manual DB Fix Triggered');
+    db.serialize(() => {
+        // Fix Users Schema
+        db.all("PRAGMA table_info(users)", (err, columns) => {
+            if (!err && columns) {
+                const hasName = columns.some(c => c.name === 'name');
+                const hasFullName = columns.some(c => c.name === 'full_name');
+
+                if (!hasName && hasFullName) {
+                    console.log('Detected incorrect Users schema (missing "name"). Migrating...');
+                    db.run("ALTER TABLE users RENAME TO users_legacy_backup_manual_" + Date.now());
+                    db.run(`CREATE TABLE users (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT DEFAULT 'user',
+                    status TEXT DEFAULT 'active',
+                    terminals TEXT,
+                    last_login TEXT,
+                    created_at TEXT,
+                    updated_at TEXT
+                )`);
+                    // Use most recent backup
+                    db.run(`INSERT OR IGNORE INTO users (id, email, password_hash, role, name, created_at, updated_at)
+                    SELECT id, email, password_hash, role, full_name, created_at, updated_at FROM users_legacy_backup`, (err) => {
+                        if (err) console.error(err);
+                    });
+                }
+            }
+        });
+        res.json({ message: "DB Fix attempted. Check server logs." });
+    });
+});
+
 // Payment Routes
 app.post('/api/payment/create-preference', async (req, res) => {
     try {
@@ -1889,8 +1927,8 @@ app.get('/api/admin/stats', authenticateToken, (req, res) => {
         // Mock data for others to prevent crashes until tables exist
         stats.companies = 0;
 
-        // Get Top Terminals (mock or real)
-        db.all("SELECT id, name, visits FROM terminals ORDER BY visits DESC LIMIT 5", [], (err, rows) => {
+        // Get Top Terminals (Just 5 random active ones as 'visits' column doesn't exist)
+        db.all("SELECT id, name FROM terminals WHERE is_active = 1 LIMIT 5", [], (err, rows) => {
             if (!err) stats.topTerminals = rows;
 
             res.json(stats);

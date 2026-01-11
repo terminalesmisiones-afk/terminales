@@ -228,6 +228,15 @@ export const api = {
         return response.json();
     },
 
+    fixDbSchema: async () => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/debug/fix-db`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.json();
+    },
+
     deleteBanner: async (id: number | string) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/banners/${id}`, {
