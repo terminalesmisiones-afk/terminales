@@ -1848,48 +1848,60 @@ app.post('/api/payment/create-preference', async (req, res) => {
 
 
 // Admin: Dashboard Stats
-app.get('/api/admin/stats', authenticateToken, (req, res) => {
-    const stats = {
-        terminals: 0,
-        users: 0,
-        companies: 0,
-        banners: 0,
-        topTerminals: [],
-        recentActivity: []
-    };
+// Admin: Dashboard Stats (Robust Version)
+app.get('/api/admin/stats', authenticateToken, async (req, res) => {
+    try {
+        const stats = {
+            terminals: 0,
+            users: 0,
+            companies: 0,
+            banners: 0,
+            topTerminals: [],
+            recentActivity: []
+        };
 
-    const queries = [
-        new Promise(resolve => db.get("SELECT COUNT(*) as count FROM terminals", (err, row) => resolve(row ? row.count : 0))),
-        new Promise(resolve => db.get("SELECT COUNT(*) as count FROM users", (err, row) => resolve(row ? row.count : 0))),
-        // Asumiendo que existe tabla companies o se cuenta de otra forma, si no existe pondremos 0 o ajustaremos
-        // new Promise(resolve => db.get("SELECT COUNT(*) as count FROM companies", (err, row) => resolve(row ? row.count : 0))),
-        new Promise(resolve => db.get("SELECT COUNT(*) as count FROM banners", (err, row) => resolve(row ? row.count : 0)))
-    ];
-
-    // Check if 'companies' table exists before querying, or just skip it if we know it doesn't
-    // For now, let's query specific tables we know exist: terminals, users, banners.
-
-    Promise.all([
-        new Promise((resolve, reject) => db.get("SELECT COUNT(*) as count FROM terminals WHERE is_active = 1", (err, row) => err ? resolve(0) : resolve(row.count))),
-        new Promise((resolve, reject) => db.get("SELECT COUNT(*) as count FROM users", (err, row) => err ? resolve(0) : resolve(row.count))),
-        new Promise((resolve, reject) => db.get("SELECT COUNT(*) as count FROM banners", (err, row) => err ? resolve(0) : resolve(row.count)))
-    ]).then(([terminalsCount, usersCount, bannersCount]) => {
-        stats.terminals = terminalsCount;
-        stats.users = usersCount;
-        stats.banners = bannersCount;
-        // Mock data for others to prevent crashes until tables exist
-        stats.companies = 0;
-
-        // Get Top Terminals (Just 5 random active ones as 'visits' column doesn't exist)
-        db.all("SELECT id, name FROM terminals WHERE is_active = 1 LIMIT 5", [], (err, rows) => {
-            if (!err) stats.topTerminals = rows;
-
-            res.json(stats);
+        // Helper seguro para conteos
+        const getCount = (table, where = '') => new Promise(resolve => {
+            db.get(`SELECT COUNT(*) as count FROM ${table} ${where}`, (err, row) => {
+                if (err) {
+                    console.error(`Error counting ${table}:`, err.message);
+                    resolve(0);
+                } else {
+                    resolve(row ? row.count : 0);
+                }
+            });
         });
-    }).catch(err => {
-        console.error("Stats Error:", err);
-        res.status(500).json({ error: "Failed to fetch stats" });
-    });
+
+        // Ejecutar conteos en paralelo
+        const [terminals, users, banners] = await Promise.all([
+            getCount('terminals', 'WHERE is_active = 1'),
+            getCount('users'),
+            getCount('banners')
+        ]);
+
+        stats.terminals = terminals;
+        stats.users = users;
+        stats.banners = banners;
+
+        // Top Terminals (Seguro)
+        try {
+            const topRows = await new Promise((resolve, reject) => {
+                // Verificar si la tabla existe primero o simplemente intentar
+                db.all("SELECT id, name FROM terminals WHERE is_active = 1 LIMIT 5", (err, rows) => {
+                    if (err) reject(err); else resolve(rows || []);
+                });
+            });
+            stats.topTerminals = topRows;
+        } catch (e) {
+            console.error("Error fetching top terminals:", e.message);
+        }
+
+        res.json(stats);
+
+    } catch (err) {
+        console.error("Stats Fatal Error:", err);
+        res.status(500).json({ error: "Failed to fetch stats", details: err.message });
+    }
 });
 
 // Start Server
