@@ -168,7 +168,7 @@ db.serialize(() => {
   });
 
   // Users Table (Local Authentication)
-  db.run(`CREATE TABLE IF NOT EXISTS users (
+  /* db.run(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -183,7 +183,7 @@ db.serialize(() => {
     created_at TEXT,
     updated_at TEXT,
     FOREIGN KEY(terminal_id) REFERENCES terminals(id) ON DELETE SET NULL
-  )`);
+  )`); */
 
   // User Registrations Table (Pending Approval)
   db.run(`CREATE TABLE IF NOT EXISTS user_registrations (
@@ -215,6 +215,39 @@ db.serialize(() => {
     is_read INTEGER DEFAULT 0,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
+
+  // Schema Correction for 'users' table (Auto-Migration)
+  db.all("PRAGMA table_info(users)", (err, columns) => {
+    if (!err && columns) {
+      const hasName = columns.some(c => c.name === 'name');
+      const hasFullName = columns.some(c => c.name === 'full_name');
+
+      if (!hasName && hasFullName) {
+        console.log('Detected incorrect Users schema (missing "name"). Migrating...');
+        db.serialize(() => {
+          db.run("ALTER TABLE users RENAME TO users_legacy_backup");
+          db.run(`CREATE TABLE users (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
+            status TEXT DEFAULT 'active',
+            terminals TEXT,
+            last_login TEXT,
+            created_at TEXT,
+            updated_at TEXT
+          )`);
+          // Migrate Data: name <- full_name
+          db.run(`INSERT OR IGNORE INTO users (id, email, password_hash, role, name, created_at, updated_at)
+                  SELECT id, email, password_hash, role, full_name, created_at, updated_at FROM users_legacy_backup`, (err) => {
+            if (err) console.error("Migration Copy Error:", err);
+            else console.log("Users schema fixed and data migrated.");
+          });
+        });
+      }
+    }
+  });
 
   console.log('Database tables initialized.');
 });

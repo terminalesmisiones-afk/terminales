@@ -152,13 +152,7 @@ const BannerManager = () => {
     setLoading(true);
     console.log('[BannerManager] Fetching banners...');
     try {
-      // Test Ping
-      try {
-        const ping = await fetch('http://localhost:3005/api/ping');
-        console.log('[BannerManager] Ping result:', ping.status, await ping.json());
-      } catch (e) {
-        console.error('[BannerManager] Ping failed:', e);
-      }
+
 
       const data = await api.getAdminBanners();
       console.log('[BannerManager] Raw data received:', data);
