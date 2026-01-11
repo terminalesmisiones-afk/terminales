@@ -1012,54 +1012,7 @@ app.get('/api/analytics/search-stats', authenticateToken, (req, res) => {
 });
 
 // --- MercadoPago Routes ---
-const { MercadoPagoConfig, Preference } = require('mercadopago');
-
-app.post('/api/payment/create-preference', async (req, res) => {
-    try {
-        const { title, price, quantity } = req.body;
-
-        // 1. Get Access Token from Settings
-        const settingsRow = await new Promise((resolve, reject) => {
-            db.get("SELECT value FROM app_settings WHERE key = 'mercadopago_config'", [], (err, row) => {
-                if (err) reject(err); else resolve(row);
-            });
-        });
-
-        if (!settingsRow) return res.status(500).json({ error: 'MercadoPago not configured in Admin' });
-        const config = JSON.parse(settingsRow.value);
-
-        if (!config.accessToken) return res.status(500).json({ error: 'Access Token missing' });
-
-        // 2. Initialize Client
-        const client = new MercadoPagoConfig({ accessToken: config.accessToken });
-        const preference = new Preference(client);
-
-        // 3. Create Preference
-        const result = await preference.create({
-            body: {
-                items: [
-                    {
-                        title: title,
-                        quantity: quantity || 1,
-                        unit_price: Number(price),
-                        currency_id: 'ARS',
-                    },
-                ],
-                back_urls: {
-                    success: req.headers.origin + '/publicidad?status=success',
-                    failure: req.headers.origin + '/publicidad?status=failure',
-                    pending: req.headers.origin + '/publicidad?status=pending',
-                },
-                auto_return: 'approved',
-            }
-        });
-
-        res.json({ id: result.id, init_point: result.init_point });
-    } catch (error) {
-        console.error('MercadoPago Error:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
+// (Bloque MercadoPago eliminado por duplicidad. Ver línea 1850)
 
 // --- User Registration Routes ---
 const emailService = require('./emailService');
